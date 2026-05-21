@@ -25,17 +25,8 @@ jobs:
         with:
           packages: "platforms;android-34 build-tools;34.0.0"
 
-      # Note: the v0.1.0 cut does not yet ship a Gradle wrapper. We install
-      # Gradle 8.7 directly via the setup-gradle action and invoke `gradle`
-      # rather than `./gradlew`. Once a wrapper is committed, switch this
-      # back to `./gradlew test`.
-      - name: Set up Gradle 8.7
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: "8.7"
-
       - name: Build
-        run: gradle :zennopay:assemble --no-daemon
+        run: ./gradlew :zennopay:assemble --no-daemon
 
       - name: Test
-        run: gradle :zennopay:test --no-daemon
+        run: ./gradlew :zennopay:test --no-daemon
