@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Intentionally empty.
+
+  The partner application is responsible for registering the
+  ZennopayCallbackActivity intent-filter for its own return scheme
+  (e.g. "wizz://payment-result"). See android-sdk/README.md.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" />

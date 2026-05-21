@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: gradle test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: "platforms;android-34 build-tools;34.0.0"
+
+      # Note: the v0.1.0 cut does not yet ship a Gradle wrapper. We install
+      # Gradle 8.7 directly via the setup-gradle action and invoke `gradle`
+      # rather than `./gradlew`. Once a wrapper is committed, switch this
+      # back to `./gradlew test`.
+      - name: Set up Gradle 8.7
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.7"
+
+      - name: Build
+        run: gradle :zennopay:assemble --no-daemon
+
+      - name: Test
+        run: gradle :zennopay:test --no-daemon
