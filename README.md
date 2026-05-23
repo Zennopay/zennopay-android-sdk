@@ -37,7 +37,7 @@ The SDK is not yet on a public Maven repo. Until then, publish to
 `mavenLocal()`:
 
 ```bash
-git clone https://github.com/amanpal108/zennopay-android-sdk
+git clone https://github.com/Zennopay/zennopay-android-sdk
 cd zennopay-android-sdk
 ./gradlew :zennopay:publishToMavenLocal
 ```
