@@ -2,6 +2,46 @@
 
 All notable changes to the Zennopay Android SDK are documented here.
 
+## 0.2.1 - 2026-07-18
+
+Accessibility + fee transparency.
+
+### Added
+
+- **Payment breakdown sheet** — tapping the review screen's "You'll pay
+  exactly" row opens the full cost breakdown: what the merchant receives,
+  the locked exchange rate, subtotal, the convenience fee ($0.00 under the
+  zero-fee launch pricing), and the exact total. The merchant always receives
+  the exact QR amount; no hidden margin is added to the rate.
+- **"Powered by Zennopay" footer** on every screen, with light/dark wordmark
+  variants (white over the camera surface). Not overridable via
+  `ZennopayAppearance`.
+- **Debug screen gallery** (`debug` builds only): render any screen with mock
+  state — no network, no camera, no money movement.
+
+### Accessibility
+
+- Font-scale caps: text follows the system font size, clamped (~1.65× for
+  text, ~1.35× for the large amount numerals) so the keypad and slide-to-pay
+  always stay reachable; amount heroes auto-shrink instead of clipping.
+- TalkBack: slide-to-pay is activatable by double-tap (sliding is not
+  required), every scanner/keypad/receipt control carries a human label and
+  role, money labels read naturally ("US dollar equivalent $140.00"), and the
+  breakdown rows read as single elements.
+- Touch targets are at least 48 dp throughout.
+- Reduced motion (animations off) disables the scan-line sweep, the keypad's
+  refusal shake, and the slide spring-back.
+- Keypad input policy: keys that would exceed ₫5,000,000 per payment (or the
+  9-digit ceiling) are refused with a gentle shake and a plain-language hint —
+  the amount can never overflow the screen.
+- WCAG AA contrast for fine print in both light and dark mode.
+
+### Changed
+
+- Unit test suite grew from 89 to 132 tests (input policy, type-scale caps,
+  currency overflow guards, and Compose semantics-tree accessibility tests),
+  plus an on-device instrumented smoke suite.
+
 ## 0.2.0 - 2026-07-17
 
 The **PaymentSheet** release: the SDK now renders the entire pay experience

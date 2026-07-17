@@ -24,14 +24,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -63,6 +63,9 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -88,6 +91,7 @@ internal fun ScannerScreen(
     scanning: CheckoutState.Scanning?,
     checking: Boolean,
     corridor: String?,
+    reducedMotion: Boolean,
     onEvent: (CheckoutEvent) -> Unit,
 ) {
     val palette = ZColors.palette()
@@ -156,17 +160,24 @@ internal fun ScannerScreen(
                 permissionDenied = permissionDenied,
                 onClose = { onEvent(CheckoutEvent.Cancel) },
             )
-            Spacer(Modifier.weight(1f))
-            ScannerReticle(
-                accent = palette.accent,
+            // The reticle takes the flexible middle: capped at 320dp but
+            // SHRINKS on small screens so the branding row, controls, help
+            // link, and footer always stay on screen (small-phone QA pass).
+            Box(
                 modifier = Modifier
-                    .align(Alignment.CenterHorizontally)
-                    .widthIn(max = 320.dp)
+                    .weight(1f)
                     .fillMaxWidth()
-                    .aspectRatio(1f)
                     .padding(horizontal = ZSpace.xl),
-            )
-            Spacer(Modifier.weight(1f))
+                contentAlignment = Alignment.Center,
+            ) {
+                ScannerReticle(
+                    accent = palette.accent,
+                    reducedMotion = reducedMotion,
+                    modifier = Modifier
+                        .sizeIn(maxWidth = 320.dp, maxHeight = 320.dp)
+                        .aspectRatio(1f),
+                )
+            }
             BrandingSection(
                 branding = branding,
                 hint = galleryHint
@@ -190,8 +201,9 @@ internal fun ScannerScreen(
                 modifier = Modifier
                     .align(Alignment.CenterHorizontally)
                     .padding(top = ZSpace.xs, bottom = ZSpace.sm)
-                    .height(44.dp)
-                    .clickable { showHelpSheet = true }
+                    // ≥48dp touch target (Android guideline).
+                    .heightIn(min = 48.dp)
+                    .clickable(role = Role.Button) { showHelpSheet = true }
                     .padding(horizontal = ZSpace.md, vertical = ZSpace.sm)
                     .testTag("zp.scan.help"),
             )
@@ -345,17 +357,29 @@ private fun CheckingPill(modifier: Modifier = Modifier) {
  * line with a translucent gradient trail sweeping top→bottom on repeat.
  */
 @Composable
-internal fun ScannerReticle(accent: Color, modifier: Modifier = Modifier) {
-    val transition = rememberInfiniteTransition(label = "scanSweep")
-    val sweep by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2_000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart,
-        ),
-        label = "scanSweepFraction",
-    )
+internal fun ScannerReticle(
+    accent: Color,
+    modifier: Modifier = Modifier,
+    reducedMotion: Boolean = false,
+) {
+    // Reduced motion (animator scale off): no sweep — the line rests at a
+    // fixed third of the frame instead of looping forever.
+    val sweep: Float
+    if (reducedMotion) {
+        sweep = 0.33f
+    } else {
+        val transition = rememberInfiniteTransition(label = "scanSweep")
+        val animated by transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 2_000, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart,
+            ),
+            label = "scanSweepFraction",
+        )
+        sweep = animated
+    }
 
     Canvas(modifier = modifier.clipToBounds()) {
         val w = size.width
@@ -521,7 +545,7 @@ private fun ScannerControls(
                 .weight(1f)
                 .height(56.dp)
                 .background(Color.White.copy(alpha = 0.16f), CircleShape)
-                .clickable(onClick = onPaste)
+                .clickable(role = Role.Button, onClick = onPaste)
                 .testTag("zp.scan.pasteCode"),
             contentAlignment = Alignment.Center,
         ) {
@@ -557,7 +581,9 @@ private fun CircleControl(
             .size(56.dp)
             .alpha(if (enabled) 1f else 0.45f)
             .background(Color.White.copy(alpha = 0.16f), CircleShape)
-            .clickable(enabled = enabled, onClick = onClick)
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            // TalkBack reads the human label, not the emoji glyph.
+            .semantics { contentDescription = label }
             .testTag(testTag),
         contentAlignment = Alignment.Center,
     ) {
@@ -626,7 +652,9 @@ internal fun PasteCodeSheet(
                 color = palette.accent,
                 style = tabularStyle(14.sp, ZType.medium, palette.accent),
                 modifier = Modifier
-                    .clickable {
+                    // ≥48dp touch target (Android guideline).
+                    .heightIn(min = 48.dp)
+                    .clickable(role = Role.Button) {
                         clipboard.getText()?.text?.let { pasteText = it }
                     }
                     .padding(vertical = ZSpace.sm)

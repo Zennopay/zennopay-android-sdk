@@ -509,6 +509,35 @@ internal class CheckoutController(
             )
         }
 
+    // ---- Debug gallery -------------------------------------------------------
+
+    /**
+     * DEBUG-GALLERY ONLY: freeze the controller into an arbitrary state with
+     * injected mock data — NO network, NO money movement (the gallery's
+     * transport fails instantly if anything ever tries). Called exclusively by
+     * the debug-variant screen gallery (`src/debug`) and semantics tests;
+     * never from the production flow.
+     */
+    internal fun debugApply(
+        state: CheckoutState,
+        scan: ScanResult? = null,
+        snapshot: IntentStatus? = null,
+        peek: QrPayload.Peek? = null,
+        corridor: String? = null,
+        purpose: String = "",
+        walletDebited: Boolean = false,
+        confirmedAtMillis: Long? = null,
+    ) {
+        lastScan = scan
+        receiptStatus = snapshot
+        qrPeek = peek
+        corridor?.let { _corridor.value = it }
+        purposeText.value = purpose
+        this.walletDebited = walletDebited
+        this.confirmedAtMillis = confirmedAtMillis
+        _state.value = state
+    }
+
     /** Display model for the terminal receipt / pending-detail screens. */
     data class Receipt(
         val merchantName: String,

@@ -4,6 +4,7 @@ import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -75,69 +76,84 @@ private fun CheckoutRootContent(controller: CheckoutController, sandbox: Boolean
             .fillMaxSize()
             .background(if (onScanner) Color.Black else palette.bg),
     ) {
-        when (val s = state) {
-            is CheckoutState.Scanning -> ScannerScreen(
-                scanning = s,
-                checking = false,
-                corridor = corridor,
-                onEvent = controller::dispatch,
-            )
-            is CheckoutState.SubmittingScan ->
-                if (s.fromKeypad) {
-                    QuoteLoadingScreen()
-                } else {
-                    // Keep the scanner chrome up with the "Checking…" pill.
-                    ScannerScreen(
-                        scanning = null,
-                        checking = true,
+        Column(modifier = Modifier.fillMaxSize()) {
+            Box(modifier = Modifier.weight(1f)) {
+                when (val s = state) {
+                    is CheckoutState.Scanning -> ScannerScreen(
+                        scanning = s,
+                        checking = false,
                         corridor = corridor,
+                        reducedMotion = reducedMotion,
                         onEvent = controller::dispatch,
                     )
-                }
-            is CheckoutState.AmountEntry -> KeypadScreen(
-                state = s,
-                corridor = corridor,
-                onEvent = controller::dispatch,
-            )
-            is CheckoutState.Quoted -> ReviewScreen(
-                controller = controller,
-                scan = s.scan,
-                confirming = false,
-                refreshingQuote = s.refreshingQuote,
-                transientError = s.transientError?.let { humanMessage(it) },
-                reducedMotion = reducedMotion,
-                onEvent = controller::dispatch,
-            )
-            is CheckoutState.Confirming -> ReviewScreen(
-                controller = controller,
-                scan = s.scan,
-                confirming = true,
-                refreshingQuote = false,
-                transientError = null,
-                reducedMotion = reducedMotion,
-                onEvent = controller::dispatch,
-            )
-            is CheckoutState.Processing -> ProcessingScreen(onEvent = controller::dispatch)
-            is CheckoutState.Terminal -> when (val result = s.result) {
-                is PaymentResult.Completed -> ReceiptScreen(
-                    controller = controller,
-                    reducedMotion = reducedMotion,
-                    onEvent = controller::dispatch,
-                )
-                is PaymentResult.Failed -> FailureScreen(
-                    controller = controller,
-                    error = result.error,
-                    onEvent = controller::dispatch,
-                )
-                is PaymentResult.Pending -> PendingDetailScreen(
-                    controller = controller,
-                    onEvent = controller::dispatch,
-                )
-                is PaymentResult.Canceled -> {
-                    // No UI — the controller already delivered Canceled to the
-                    // host, which tears the activity down.
+                    is CheckoutState.SubmittingScan ->
+                        if (s.fromKeypad) {
+                            QuoteLoadingScreen()
+                        } else {
+                            // Keep the scanner chrome up with the "Checking…" pill.
+                            ScannerScreen(
+                                scanning = null,
+                                checking = true,
+                                corridor = corridor,
+                                reducedMotion = reducedMotion,
+                                onEvent = controller::dispatch,
+                            )
+                        }
+                    is CheckoutState.AmountEntry -> KeypadScreen(
+                        state = s,
+                        corridor = corridor,
+                        reducedMotion = reducedMotion,
+                        onEvent = controller::dispatch,
+                    )
+                    is CheckoutState.Quoted -> ReviewScreen(
+                        controller = controller,
+                        scan = s.scan,
+                        confirming = false,
+                        refreshingQuote = s.refreshingQuote,
+                        transientError = s.transientError?.let { humanMessage(it) },
+                        reducedMotion = reducedMotion,
+                        onEvent = controller::dispatch,
+                    )
+                    is CheckoutState.Confirming -> ReviewScreen(
+                        controller = controller,
+                        scan = s.scan,
+                        confirming = true,
+                        refreshingQuote = false,
+                        transientError = null,
+                        reducedMotion = reducedMotion,
+                        onEvent = controller::dispatch,
+                    )
+                    is CheckoutState.Processing -> ProcessingScreen(onEvent = controller::dispatch)
+                    is CheckoutState.Terminal -> when (val result = s.result) {
+                        is PaymentResult.Completed -> ReceiptScreen(
+                            controller = controller,
+                            reducedMotion = reducedMotion,
+                            onEvent = controller::dispatch,
+                        )
+                        is PaymentResult.Failed -> FailureScreen(
+                            controller = controller,
+                            error = result.error,
+                            onEvent = controller::dispatch,
+                        )
+                        is PaymentResult.Pending -> PendingDetailScreen(
+                            controller = controller,
+                            onEvent = controller::dispatch,
+                        )
+                        is PaymentResult.Canceled -> {
+                            // No UI — the controller already delivered Canceled to
+                            // the host, which tears the activity down.
+                        }
+                    }
                 }
             }
+            // Trust footer on EVERY screen, at container level (iOS parity):
+            // white-wordmark variant over the black camera surface.
+            PoweredByZennopay(
+                darkSurface = onScanner,
+                modifier = Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .padding(top = 2.dp, bottom = 6.dp),
+            )
         }
 
         if (sandbox && !onScanner) {

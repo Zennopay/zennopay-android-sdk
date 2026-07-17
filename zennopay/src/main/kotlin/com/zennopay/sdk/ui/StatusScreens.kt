@@ -245,7 +245,7 @@ internal fun ReceiptScreen(
             trailing = {
                 IconButton(
                     onClick = { receipt?.let { shareReceipt(context, it) } },
-                    modifier = Modifier.size(44.dp),
+                    modifier = Modifier.size(48.dp),
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Share,
@@ -290,10 +290,9 @@ internal fun ReceiptScreen(
                             style = tabularStyle(14.sp, ZType.regular, palette.text2),
                         )
                         receipt.localMinorUnits?.let { minor ->
-                            Text(
+                            AutoShrinkText(
                                 text = CurrencyDisplay.formatMinorWithLabel(minor, receipt.localCurrency),
-                                color = palette.text,
-                                style = tabularStyle(34.sp, ZType.bold, palette.text),
+                                style = tabularStyle(34.sp, ZType.bold, palette.text, hero = true),
                                 modifier = Modifier
                                     .padding(bottom = ZSpace.sm)
                                     .testTag("zp.receipt.amount"),
@@ -486,10 +485,9 @@ internal fun PendingDetailScreen(
                     modifier = Modifier.testTag("zp.result.title"),
                 )
                 if (receipt != null) {
-                    Text(
+                    AutoShrinkText(
                         text = CurrencyDisplay.formatUsdCents(receipt.usdCents),
-                        color = palette.text,
-                        style = tabularStyle(32.sp, ZType.bold, palette.text),
+                        style = tabularStyle(32.sp, ZType.bold, palette.text, hero = true),
                     )
                     receipt.localMinorUnits?.let { minor ->
                         Text(

@@ -11,6 +11,7 @@ android {
     defaultConfig {
         minSdk = 24
         consumerProguardFiles("consumer-rules.pro")
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildFeatures {
@@ -37,6 +38,13 @@ android {
         }
         getByName("test") {
             java.srcDirs("src/test/kotlin")
+        }
+        // DEBUG-only screen gallery (mock state; compiled out of release).
+        getByName("debug") {
+            java.srcDirs("src/debug/kotlin")
+        }
+        getByName("androidTest") {
+            java.srcDirs("src/androidTest/kotlin")
         }
     }
 
@@ -92,6 +100,20 @@ dependencies {
     testImplementation("androidx.test.ext:junit:1.2.1")
     testImplementation("org.robolectric:robolectric:4.13")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+
+    // Compose semantics-tree tests. Local tests run under Robolectric (no
+    // emulator needed for the TalkBack/a11y assertions); the same suite style
+    // is also compiled for the on-device (connected) pass. The pinned Compose
+    // (1.6.x via BOM 2024.06.00) has no `enableAccessibilityChecks()` /
+    // ATF integration yet, so semantics properties are asserted directly.
+    testImplementation(composeBom)
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
+
+    androidTestImplementation(composeBom)
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.1")
 }
 
 publishing {
@@ -99,7 +121,7 @@ publishing {
         register<MavenPublication>("release") {
             groupId = "com.zennopay"
             artifactId = "sdk"
-            version = "0.2.0"
+            version = "0.2.1"
 
             afterEvaluate {
                 from(components["release"])

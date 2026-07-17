@@ -32,6 +32,12 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
@@ -66,6 +72,12 @@ internal fun SlideToConfirm(
         else palette.text3.copy(alpha = 0.4f)
     val labelColor = Color(appearance.primaryButton.textColor)
 
+    var fired by remember { mutableStateOf(false) }
+    val spinning = confirming || fired
+    LaunchedEffect(confirming) {
+        if (!confirming) fired = false
+    }
+
     BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
@@ -73,7 +85,25 @@ internal fun SlideToConfirm(
             .alpha(if (enabled) 1f else 0.6f)
             // The slide track is the one sanctioned pill surface (reference).
             .background(trackColor, CircleShape)
-            .testTag("zp.slide.track"),
+            .testTag("zp.slide.track")
+            // Sliding is not TalkBack-operable: the control is exposed as a
+            // button whose activation (double-tap) confirms without the drag —
+            // the iOS custom-accessibility-action mirror.
+            .semantics(mergeDescendants = true) {
+                role = Role.Button
+                contentDescription = if (spinning) "Processing payment" else label
+                if (!enabled || spinning) {
+                    disabled()
+                } else {
+                    onClick(label = "Confirm the payment") {
+                        if (!fired) {
+                            fired = true
+                            onConfirm()
+                        }
+                        true
+                    }
+                }
+            },
     ) {
         val insetPx = with(density) { inset.toPx() }
         val knobPx = with(density) { knobSize.toPx() }
@@ -83,17 +113,12 @@ internal fun SlideToConfirm(
 
         val offset = remember { Animatable(0f) }
         val scope = rememberCoroutineScope()
-        var fired by remember { mutableStateOf(false) }
-        val spinning = confirming || fired
 
         // Pin the knob to the end while the confirm+poll runs; snap home when
         // the control re-enables after a failed confirm ("Try again" path).
         LaunchedEffect(spinning, enabled) {
             if (spinning) offset.snapTo(maxOffset)
             else if (!enabled) offset.snapTo(0f)
-        }
-        LaunchedEffect(confirming) {
-            if (!confirming) fired = false
         }
 
         if (!spinning) {
@@ -159,7 +184,9 @@ internal fun SlideToConfirm(
             } else {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = label,
+                    // The merged track semantics carry the label; a second
+                    // description here would double-announce.
+                    contentDescription = null,
                     tint = palette.accent,
                 )
             }

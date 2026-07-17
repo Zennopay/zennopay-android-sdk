@@ -1,13 +1,18 @@
 package com.zennopay.sdk.ui
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -17,15 +22,24 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.zennopay.sdk.R
 
 /**
  * Shared sheet chrome for the themed checkout screens, the Compose mirror of
@@ -74,7 +88,7 @@ internal fun SheetHeader(
             onClick = onLeading,
             modifier = Modifier
                 .align(Alignment.CenterStart)
-                .size(44.dp)
+                .size(48.dp)
                 .semantics {
                     contentDescription = if (leading == HeaderLeading.Close) "Close" else "Back"
                 },
@@ -133,13 +147,91 @@ internal fun ZPrimaryButton(
 @Composable
 internal fun ZTextAction(label: String, onClick: () -> Unit) {
     val palette = ZColors.palette()
-    TextButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+    TextButton(onClick = onClick, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
         Text(
             text = label,
             color = palette.text2,
             style = tabularStyle(16.sp, ZType.medium, palette.text2),
         )
     }
+}
+
+/**
+ * Trust footer rendered at the bottom of EVERY PaymentSheet screen (container
+ * level, `CheckoutRoot`): "Powered by" + the Zennopay wordmark. Deliberately
+ * NOT part of the partner appearance API — the payment surface is always
+ * visibly Zennopay-operated. The wordmark asset has a light-surface (dark
+ * text) and dark-surface (white text) variant; [darkSurface] (the scanner's
+ * camera surface) forces the dark variant, and the app's dark theme selects it
+ * elsewhere. TalkBack reads the row as one element: "Powered by Zennopay".
+ */
+@Composable
+internal fun PoweredByZennopay(
+    darkSurface: Boolean = false,
+    modifier: Modifier = Modifier,
+) {
+    val palette = ZColors.palette()
+    val appearance = LocalZennopayAppearance.current
+    val darkTheme = when (appearance.mode) {
+        ZennopayAppearance.Mode.Light -> false
+        ZennopayAppearance.Mode.Dark -> true
+        ZennopayAppearance.Mode.Automatic -> isSystemInDarkTheme()
+    }
+    val wordmark =
+        if (darkSurface || darkTheme) R.drawable.zp_powered_dark else R.drawable.zp_powered_light
+    val captionColor = if (darkSurface) Color.White.copy(alpha = 0.55f) else palette.text3
+
+    Row(
+        modifier = modifier.clearAndSetSemantics {
+            testTag = "zp.poweredBy"
+            contentDescription = "Powered by Zennopay"
+        },
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "Powered by",
+            color = captionColor,
+            style = tabularStyle(13.sp, ZType.regular, captionColor),
+        )
+        Image(
+            painter = painterResource(wordmark),
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            // Pre-trimmed 284×73 artwork rendered ~18dp tall (iOS parity).
+            modifier = Modifier.height(18.dp).width(70.dp),
+        )
+    }
+}
+
+/**
+ * Single-line text that shrinks to fit its width instead of clipping — the
+ * Compose mirror of the iOS heroes' `minimumScaleFactor`. Used on the amount
+ * heroes so a defensive-overflow value (₫999,999,999) stays legible on a small
+ * phone at large font scales. Steps the font down until the line fits, flooring
+ * at [minScale] of the requested size.
+ */
+@Composable
+internal fun AutoShrinkText(
+    text: String,
+    style: androidx.compose.ui.text.TextStyle,
+    modifier: Modifier = Modifier,
+    minScale: Float = 0.4f,
+) {
+    var scale by remember(text, style.fontSize) { mutableFloatStateOf(1f) }
+    Text(
+        text = text,
+        style = style.copy(fontSize = style.fontSize * scale),
+        maxLines = 1,
+        softWrap = false,
+        overflow = androidx.compose.ui.text.style.TextOverflow.Clip,
+        onTextLayout = { layout ->
+            if (layout.didOverflowWidth && scale > minScale) {
+                scale = (scale - 0.05f).coerceAtLeast(minScale)
+            }
+        },
+        modifier = modifier,
+    )
 }
 
 /** Inline recoverable-error banner (failure tint on the failure-soft halo). */

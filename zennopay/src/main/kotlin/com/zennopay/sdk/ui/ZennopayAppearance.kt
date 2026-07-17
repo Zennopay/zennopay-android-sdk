@@ -39,7 +39,8 @@ data class ZennopayAppearance(
         val surface: Long = 0xFFFFFFFF,
         val textPrimary: Long = 0xFF0A0F14,
         val textSecondary: Long = 0xFF5A6675,
-        val textTertiary: Long = 0xFF8A949F,
+        // AA-contrast fine-print token (2026-07-17, in lockstep with iOS).
+        val textTertiary: Long = 0xFF687280,
         val border: Long = 0xFFE8E9EC,
         val success: Long = 0xFF15803D,
         val pending: Long = 0xFF7C5E1A,

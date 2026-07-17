@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -33,7 +34,11 @@ internal object ZColors {
     private const val SURFACE_L = 0xFFFFFFFF
     private const val TEXT_L = 0xFF0A0F14
     private const val TEXT2_L = 0xFF5A6675
-    private const val TEXT3_L = 0xFF8A949F
+    // text3 tuned 2026-07-17 for WCAG AA on fine print (was 0xFF8A949F /
+    // 0xFF6B7480, which measured 2.95:1 / 3.53:1 against surface): now ≥4.5:1
+    // on both bg and surface in both modes while staying below text2 for
+    // hierarchy. Kept in lockstep with the iOS `ZTokens.text3`.
+    private const val TEXT3_L = 0xFF687280
     private const val BORDER_L = 0xFFE8E9EC
     private const val SUCCESS_L = 0xFF15803D
     private const val PENDING_L = 0xFF7C5E1A
@@ -45,7 +50,7 @@ internal object ZColors {
     private val surfaceDark = Color(0xFF1A1E25)
     private val textDark = Color(0xFFF0F2F4)
     private val text2Dark = Color(0xFFA0A8B3)
-    private val text3Dark = Color(0xFF6B7480)
+    private val text3Dark = Color(0xFF8A93A0)
     private val borderDark = Color(0xFF2A3038)
     private val successDark = Color(0xFF4DA866)
     private val pendingDark = Color(0xFFC9A24B)
@@ -166,15 +171,25 @@ internal object ZType {
  * A numeric text style with mandatory `tabular-nums` (DESIGN.md: non-tabular
  * numerals are not acceptable on any amount / id / countdown). Applies the
  * partner font family + Dynamic-Type scale (capped at 1.5×).
+ *
+ * The SYSTEM font scale (sp) is additionally capped per [ZTypeScale] so
+ * accessibility sizes stay usable without destroying the fixed-chrome layout:
+ * regular text at ~1.65×, hero/display numerals ([hero] = true) at ~1.35×.
  */
 @Composable
 @ReadOnlyComposable
-internal fun tabularStyle(size: TextUnit, weight: FontWeight, color: Color): TextStyle {
+internal fun tabularStyle(
+    size: TextUnit,
+    weight: FontWeight,
+    color: Color,
+    hero: Boolean = false,
+): TextStyle {
     val typo = LocalZTypography.current
     val scale = typo.scale.coerceIn(1f, 1.5f)
+    val cap = ZTypeScale.capFactor(LocalDensity.current.fontScale, hero)
     return TextStyle(
         color = color,
-        fontSize = size * scale,
+        fontSize = size * scale * cap,
         fontWeight = weight,
         fontFamily = typo.fontFamily,
         fontFeatureSettings = "tnum",

@@ -2,6 +2,7 @@ package com.zennopay.sdk.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,10 +28,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.zennopay.sdk.internal.CheckoutController
@@ -213,10 +220,11 @@ private fun AmountHeroSection(scan: ScanResult) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(ZSpace.md),
     ) {
-        Text(
+        // Shrinks to fit rather than clipping (iOS minimumScaleFactor parity)
+        // so a defensive-overflow amount stays on one legible line.
+        AutoShrinkText(
             text = localHeadline,
-            style = tabularStyle(ZType.amount, ZType.bold, palette.text),
-            maxLines = 1,
+            style = tabularStyle(ZType.amount, ZType.bold, palette.text, hero = true),
             modifier = Modifier.testTag("zp.amount.local"),
         )
         Row(
@@ -232,7 +240,12 @@ private fun AmountHeroSection(scan: ScanResult) {
                 text = usd,
                 color = palette.text,
                 style = tabularStyle(15.sp, ZType.medium, palette.text),
-                modifier = Modifier.testTag("zp.amount.usd"),
+                modifier = Modifier
+                    .semantics {
+                        // Human-readable money label (iOS parity).
+                        contentDescription = "US dollar equivalent $usd"
+                    }
+                    .testTag("zp.amount.usd"),
             )
         }
     }
@@ -244,10 +257,26 @@ private fun DetailRowsCard(scan: ScanResult) {
     val palette = ZColors.palette()
     val quote = scan.quote
     val usd = CurrencyDisplay.formatUsdCents(quote?.amountUsdCents ?: 0L)
+    var showBreakdown by remember { mutableStateOf(false) }
+
+    if (showBreakdown) {
+        FeeBreakdownSheet(quote = quote, onDismiss = { showBreakdown = false })
+    }
+
     SurfaceCard {
         Column(modifier = Modifier.padding(horizontal = ZSpace.md)) {
+            // The whole row is a button: tapping opens the full payment
+            // breakdown (fees + locked exchange rate) as a bottom sheet.
             Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(
+                        role = Role.Button,
+                        onClickLabel = "Show the full payment breakdown, " +
+                            "including fees and the exchange rate",
+                    ) { showBreakdown = true }
+                    .padding(vertical = 14.dp)
+                    .testTag("zp.review.breakdown"),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -274,8 +303,6 @@ private fun DetailRowsCard(scan: ScanResult) {
                     modifier = Modifier.size(16.dp),
                 )
             }
-            // Fee breakdown renders here the day the quote carries fees; the
-            // staging quote has no fee model yet, so the total IS the USD debit.
             CurrencyDisplay.exchangeRateLine(
                 usdCents = quote?.amountUsdCents ?: 0L,
                 localMinorUnits = quote?.localAmountMinorUnits,
@@ -283,7 +310,11 @@ private fun DetailRowsCard(scan: ScanResult) {
             )?.let { rate ->
                 HorizontalDivider(color = palette.border, thickness = 1.dp)
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 14.dp)
+                        // One TalkBack element: "Exchange rate, 1 USD = …".
+                        .semantics(mergeDescendants = true) {},
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
