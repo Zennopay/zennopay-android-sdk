@@ -57,6 +57,51 @@ fun rememberZennopayLauncher(
     }
 }
 
+/**
+ * Compose entry point for the read-only receipt flow. Returns a `present` lambda
+ * `(intentId, receiptToken) -> Unit`; invoking it reopens the authoritative
+ * Zennopay receipt from the current Activity (resolved from [LocalContext]) and
+ * fires [onDismiss] when the sheet closes. The Compose mirror of
+ * [Zennopay.presentReceipt], consistent with [rememberZennopayLauncher].
+ *
+ * ```
+ * val presentReceipt = rememberZennopayReceiptLauncher(
+ *     refreshReceiptToken = { id -> yourBackend.remintReceiptToken(id) },
+ * ) { /* onDismiss */ }
+ * // later:
+ * Button(onClick = { presentReceipt(intentId, receiptToken) }) { Text("View receipt") }
+ * ```
+ */
+@Composable
+fun rememberZennopayReceiptLauncher(
+    config: ZennopayConfig = ZennopayConfig.STAGING,
+    appearance: ZennopayAppearance = ZennopayAppearance.Automatic,
+    refreshReceiptToken: (suspend (String) -> String?)? = null,
+    onDismiss: () -> Unit = {},
+): (intentId: String, receiptToken: String) -> Unit {
+    val context = LocalContext.current
+    return remember(context, config, appearance, refreshReceiptToken, onDismiss) {
+        { intentId: String, receiptToken: String ->
+            val activity = context.findComponentActivity()
+            if (activity == null) {
+                // No Activity in the Context chain — an integration error. There
+                // is no result channel here, so just fire onDismiss.
+                onDismiss()
+            } else {
+                Zennopay.presentReceipt(
+                    activity = activity,
+                    intentId = intentId,
+                    receiptToken = receiptToken,
+                    refreshReceiptToken = refreshReceiptToken,
+                    config = config,
+                    appearance = appearance,
+                    onDismiss = onDismiss,
+                )
+            }
+        }
+    }
+}
+
 /** Walk the ContextWrapper chain to find the hosting [ComponentActivity]. */
 private tailrec fun Context.findComponentActivity(): ComponentActivity? = when (this) {
     is ComponentActivity -> this

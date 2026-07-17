@@ -127,6 +127,55 @@ internal class ZennopayRestClient(
         }
 
     /**
+     * `GET /v1/payment_intents/{id}/receipt` — reads the authoritative receipt
+     * for a PAST payment. Authenticated by the partner-minted RECEIPT token
+     * (`aud = zennopay-receipt`), carried as `Authorization: Bearer` like every
+     * other call. Replayable (the token is reusable for polling), so a 401 →
+     * `refreshSession` (the receipt-token re-mint hook) → retry is always safe.
+     */
+    suspend fun getReceipt(intentId: String): ApiResult<ReceiptDto> =
+        request(intentId, "GET", "$intentId/receipt", null) { json ->
+            ReceiptDto.parse(json)
+        }
+
+    /**
+     * Poll `GET /{id}/receipt` with linear-then-capped backoff until the receipt
+     * status is terminal (captured/failed/refunded) or the budget is exhausted,
+     * at which point it returns [ZennopayError.PollingTimeout]. Transient network
+     * errors are tolerated up to [maxTransientErrors] before giving up. Mirrors
+     * [pollUntilTerminal] but reads the receipt endpoint.
+     */
+    suspend fun pollReceiptUntilTerminal(
+        intentId: String,
+        maxAttempts: Int = 40,
+        initialDelayMillis: Long = 1_000L,
+        maxDelayMillis: Long = 3_000L,
+        maxTransientErrors: Int = 5,
+    ): ApiResult<ReceiptDto> {
+        var transientErrors = 0
+        var delayMillis = initialDelayMillis
+        repeat(maxAttempts) {
+            when (val r = getReceipt(intentId)) {
+                is ApiResult.Ok -> {
+                    if (r.value.receiptStatus?.isTerminal == true) return r
+                    transientErrors = 0
+                }
+                is ApiResult.Err -> {
+                    // Auth/state errors are fatal; network blips are tolerated.
+                    if (r.error is ZennopayError.NetworkError) {
+                        if (++transientErrors > maxTransientErrors) return r
+                    } else {
+                        return r
+                    }
+                }
+            }
+            delay(delayMillis)
+            delayMillis = (delayMillis + 500L).coerceAtMost(maxDelayMillis)
+        }
+        return ApiResult.Err(ZennopayError.PollingTimeout)
+    }
+
+    /**
      * Bounded status polling with linear-then-capped backoff. Polls until the
      * intent reaches a terminal state or the budget is exhausted, at which point
      * it returns [ZennopayError.PollingTimeout]. Transient network errors during

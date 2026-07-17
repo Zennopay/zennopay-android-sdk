@@ -47,6 +47,7 @@ import com.zennopay.sdk.ZennopayError
 import com.zennopay.sdk.internal.CheckoutController
 import com.zennopay.sdk.internal.CheckoutEvent
 import com.zennopay.sdk.internal.CurrencyDisplay
+import com.zennopay.sdk.internal.net.ReceiptStatus
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -58,6 +59,30 @@ import java.util.Locale
  * mirrors). Terminal screens are persistent — Done delivers the result; there
  * is NO auto-dismiss.
  */
+
+/**
+ * The `presentReceipt` flow's initial loading state: a themed spinner while the
+ * authoritative receipt is fetched. Distinct copy from the checkout "Payment
+ * processing…" card — here we are reopening an existing payment, not making one.
+ * Mirrors the iOS `ReceiptLoadingScreen`.
+ */
+@Composable
+internal fun ReceiptLoadingScreen() {
+    val palette = ZColors.palette()
+    Column(
+        modifier = Modifier.fillMaxSize().testTag("zp.receipt.loading"),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        CircularProgressIndicator(color = palette.accent, strokeWidth = 2.dp)
+        Text(
+            text = "Loading your receipt…",
+            color = palette.text2,
+            style = tabularStyle(15.sp, ZType.regular, palette.text2),
+            modifier = Modifier.padding(top = ZSpace.md),
+        )
+    }
+}
 
 /** Themed loading state while a keypad-entered amount is being quoted. */
 @Composable
@@ -229,6 +254,9 @@ internal fun ReceiptScreen(
     val palette = ZColors.palette()
     val context = LocalContext.current
     val receipt = controller.receipt
+    // A refunded receipt reuses the success card with refund copy (the debit did
+    // happen, then was returned) — iOS parity.
+    val refunded = controller.receiptDisplayStatus == ReceiptStatus.REFUNDED
 
     var entered by remember { mutableStateOf(reducedMotion) }
     val checkScale by animateFloatAsState(
@@ -271,18 +299,31 @@ internal fun ReceiptScreen(
                     Icon(
                         imageVector = Icons.Filled.CheckCircle,
                         contentDescription = null,
-                        tint = palette.success,
+                        tint = if (refunded) palette.pending else palette.success,
                         modifier = Modifier
                             .padding(top = ZSpace.lg)
                             .size(56.dp)
                             .scale(checkScale),
                     )
                     Text(
-                        text = "Payment successful",
-                        color = palette.success,
-                        style = tabularStyle(20.sp, ZType.bold, palette.success),
+                        text = if (refunded) "Payment refunded" else "Payment successful",
+                        color = if (refunded) palette.text else palette.success,
+                        style = tabularStyle(
+                            20.sp, ZType.bold, if (refunded) palette.text else palette.success,
+                        ),
                         modifier = Modifier.testTag("zp.result.title"),
                     )
+                    if (refunded) {
+                        Text(
+                            text = "This payment was refunded to your wallet.",
+                            color = palette.text2,
+                            style = tabularStyle(14.sp, ZType.regular, palette.text2),
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .padding(horizontal = ZSpace.md)
+                                .testTag("zp.receipt.refunded"),
+                        )
+                    }
                     if (receipt != null) {
                         Text(
                             text = receiptTimestamp(receipt.timestampMillis),

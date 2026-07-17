@@ -31,5 +31,14 @@
             android:exported="false"
             android:theme="@style/Theme.Zennopay.Checkout"
             android:configChanges="orientation|screenSize|keyboardHidden|uiMode" />
+        <!--
+          Full-screen host for the read-only receipt flow. Launched by
+          Zennopay.presentReceipt(). Not exported: only the SDK starts it.
+        -->
+        <activity
+            android:name="com.zennopay.sdk.ZennopayReceiptActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Zennopay.Checkout"
+            android:configChanges="orientation|screenSize|keyboardHidden|uiMode" />
     </application>
 </manifest>

@@ -28,6 +28,22 @@ internal object CurrencyDisplay {
         else -> ""
     }
 
+    /**
+     * Normalize a currency code to the numeric ISO-4217 form the display helpers
+     * expect. Accepts either the numeric code the checkout contract uses
+     * ("704"/"764"/"840") or an alpha code ("VND"/"THB"/"USD") that the receipt
+     * endpoint may return. Unknown values pass through unchanged; null/empty → null.
+     */
+    fun numericCode(code: String?): String? {
+        if (code.isNullOrEmpty()) return null
+        return when (code.uppercase(Locale.US)) {
+            "704", "VND" -> "704"
+            "764", "THB" -> "764"
+            "840", "USD" -> "840"
+            else -> code
+        }
+    }
+
     /** Short alpha label for a numeric ISO-4217 code. */
     fun label(numeric: String?): String = when (numeric) {
         "764" -> "THB"

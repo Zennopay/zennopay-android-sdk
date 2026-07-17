@@ -2,6 +2,33 @@
 
 All notable changes to the Zennopay Android SDK are documented here.
 
+## 0.3.0 - 2026-07-18
+
+Reopen the authoritative receipt.
+
+### Added
+
+- **`Zennopay.presentReceipt(...)`** (and the Compose
+  `rememberZennopayReceiptLauncher`) — reopen the **authoritative Zennopay
+  receipt** for a *past* payment, with live pending/refund status, without
+  moving any money. Your backend mints a short-lived RS256 **receipt token**
+  (`aud = zennopay-receipt`, `sub = partner_user_id`, ≤15-min exp, reusable
+  for polling); the SDK sends it as `Authorization: Bearer` on
+  `GET /v1/payment_intents/{id}/receipt` and renders the same terminal
+  screens as checkout:
+  - `captured` / `refunded` → the receipt screen (refunded carries "refunded
+    to your wallet" messaging);
+  - `failed` → the failure screen;
+  - `pending` → the pending detail, polling until it resolves (respecting the
+    poll interval/timeout; a 401 mid-poll re-mints via `refreshReceiptToken`).
+- Tolerant receipt parsing: all four statuses, an alpha *or* numeric currency
+  (`VND`/`704`), a numeric *or* string exchange rate, and missing display
+  fields never fail the decode — the backend stays authoritative.
+
+`presentReceipt` is fully independent of `presentCheckout`, which is
+unchanged and source-compatible. Depend on it with
+`implementation("in.zennopay:sdk:0.3.0")`.
+
 ## 0.2.1 - 2026-07-18
 
 Accessibility + fee transparency.

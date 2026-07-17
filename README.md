@@ -30,7 +30,7 @@ Gradle Kotlin DSL (`build.gradle.kts`):
 
 ```kotlin
 dependencies {
-    implementation("in.zennopay:sdk:0.2.1")
+    implementation("in.zennopay:sdk:0.3.0")
 }
 ```
 
@@ -38,7 +38,7 @@ Gradle Groovy (`build.gradle`):
 
 ```groovy
 dependencies {
-    implementation 'in.zennopay:sdk:0.2.1'
+    implementation 'in.zennopay:sdk:0.3.0'
 }
 ```
 
@@ -49,7 +49,7 @@ dependencies {
 >
 > ```kotlin
 > // dependency coordinate
-> implementation("in.zennopay:sdk:0.2.1")
+> implementation("in.zennopay:sdk:0.3.0")
 > // …but the imports stay:
 > import com.zennopay.sdk.Zennopay
 > import com.zennopay.sdk.PaymentResult
@@ -130,6 +130,55 @@ network call, so retries and process death can never double-debit.
 `Pending` means status polling timed out before a terminal state: the
 payment may still settle, so reconcile via your webhook or the intent API
 rather than assuming failure.
+
+### Reopen a receipt (`presentReceipt`)
+
+Show the **authoritative Zennopay receipt** for a *past* payment — with live
+pending/refund status — without moving any money. Your backend mints a
+short-lived RS256 **receipt token** (`aud = zennopay-receipt`,
+`sub = partner_user_id`, ≤15-min exp, reusable for polling) and hands it to
+the app alongside the intent id. The SDK renders the same terminal screens as
+checkout: a captured/refunded payment shows the receipt (refunded carries
+refund messaging), a failed payment shows the failure screen, and a still-
+processing payment shows the pending detail and polls until it resolves.
+
+Compose:
+
+```kotlin
+import com.zennopay.sdk.rememberZennopayReceiptLauncher
+
+@Composable
+fun ReceiptButton(intentId: String, viewModel: WalletViewModel) {
+    val presentReceipt = rememberZennopayReceiptLauncher(
+        config = ZennopayConfig.STAGING,
+        refreshReceiptToken = { id ->
+            // Called on token expiry (401): re-mint for the same user, or null.
+            viewModel.remintReceiptToken(id)
+        },
+        onDismiss = { /* the user closed the receipt */ },
+    )
+    Button(onClick = { presentReceipt(intentId, viewModel.receiptToken(intentId)) }) {
+        Text("View receipt")
+    }
+}
+```
+
+Any `ComponentActivity`:
+
+```kotlin
+Zennopay.presentReceipt(
+    activity = this,
+    intentId = intentId,
+    receiptToken = receiptTokenFromYourBackend,
+    refreshReceiptToken = { id -> walletApi.remintReceiptToken(id) },
+    config = ZennopayConfig.STAGING,
+    onDismiss = { /* dismissed */ },
+)
+```
+
+The receipt token is held in memory and sent as `Authorization: Bearer` on
+`GET /v1/payment_intents/{id}/receipt` — no session JWT, no scan, no confirm.
+`presentReceipt` is fully independent of `presentCheckout`, which is unchanged.
 
 ### Theming
 

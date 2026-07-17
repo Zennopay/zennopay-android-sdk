@@ -41,11 +41,17 @@ object Zennopay {
     /** In-flight session handoffs, keyed by a one-shot launch token. */
     private val handoffs = ConcurrentHashMap<String, Handoff>()
 
+    /** In-flight receipt handoffs, keyed by a one-shot launch token. */
+    private val receiptHandoffs = ConcurrentHashMap<String, ReceiptHandoff>()
+
     /**
      * The single pending host callback + its intent id. Only one checkout can be
      * live at a time (the checkout activity covers the host).
      */
     @Volatile private var pendingListener: ((PaymentResult) -> Unit)? = null
+
+    /** The single pending `presentReceipt` dismissal callback. */
+    @Volatile private var pendingDismiss: (() -> Unit)? = null
 
     /** Optionally override the REST base + timeouts. Defaults to staging. */
     @JvmStatic
@@ -115,6 +121,64 @@ object Zennopay {
         )
     }
 
+    /**
+     * Reopen the **authoritative Zennopay receipt** for a PAST payment, with live
+     * pending/refund status. Presents modally over [activity] and renders the
+     * same terminal screens as checkout: a captured/refunded payment shows the
+     * receipt (refunded carries refund messaging); a failed payment shows the
+     * failure screen; a still-processing payment shows the pending detail and
+     * polls until it resolves. No session JWT, NO money movement.
+     *
+     * The host's backend mints a short-lived RS256 **receipt token**
+     * (`aud = zennopay-receipt`, `sub = partner_user_id`, ≤15-min exp, reusable
+     * for polling) and hands it to the app alongside the intent id. The SDK holds
+     * it in memory and sends it as `Authorization: Bearer` on
+     * `GET /v1/payment_intents/{id}/receipt`.
+     *
+     * @param refreshReceiptToken optional host hook invoked on a 401 (token
+     *   expiry). Given the intent id, it re-mints a fresh receipt token (or
+     *   returns null if it can't). When null, a 401 is surfaced as a failure.
+     *   Mirrors [presentCheckout]'s `refreshSession`.
+     * @param onDismiss invoked after the sheet is dismissed (the user tapped
+     *   Done / close, or the token failed to load).
+     */
+    @JvmStatic
+    @JvmOverloads
+    fun presentReceipt(
+        activity: ComponentActivity,
+        intentId: String,
+        receiptToken: String,
+        refreshReceiptToken: (suspend (String) -> String?)? = null,
+        config: ZennopayConfig = this.config,
+        appearance: ZennopayAppearance = ZennopayAppearance.Automatic,
+        onDismiss: () -> Unit,
+    ) {
+        // Light client-side check: seed a failure screen for a structurally
+        // broken token (empty / not decodable). The backend is authoritative on
+        // validity beyond that (expiry/audience are re-minted / re-checked).
+        val preflightError: ZennopayError? = when (JwtClaims.lightDecodeReceiptToken(receiptToken)) {
+            JwtClaims.ReceiptTokenResult.Valid -> null
+            JwtClaims.ReceiptTokenResult.Empty -> ZennopayError.InvalidJwt
+            JwtClaims.ReceiptTokenResult.Malformed -> ZennopayError.MalformedToken
+        }
+
+        pendingDismiss = onDismiss
+
+        val token = UUID.randomUUID().toString()
+        receiptHandoffs[token] = ReceiptHandoff(
+            intentId = intentId,
+            receiptToken = receiptToken,
+            refreshReceiptToken = refreshReceiptToken,
+            appearance = appearance,
+            config = config,
+            preflightError = preflightError,
+        )
+
+        activity.startActivity(
+            ZennopayReceiptActivity.newIntent(activity, token, intentId),
+        )
+    }
+
     private fun mapValidationFailure(
         result: JwtClaims.ValidationResult,
         intentId: String,
@@ -134,11 +198,21 @@ object Zennopay {
 
     internal fun consumeHandoff(token: String): Handoff? = handoffs.remove(token)
 
+    internal fun consumeReceiptHandoff(token: String): ReceiptHandoff? =
+        receiptHandoffs.remove(token)
+
     /** Deliver the terminal result to the host and clear the pending slot. */
     internal fun deliverExternally(result: PaymentResult) {
         val listener = pendingListener
         pendingListener = null
         listener?.invoke(result)
+    }
+
+    /** Fire the `presentReceipt` dismissal callback once and clear the slot. */
+    internal fun deliverDismiss() {
+        val listener = pendingDismiss
+        pendingDismiss = null
+        listener?.invoke()
     }
 
     /**
@@ -154,5 +228,20 @@ object Zennopay {
         val config: ZennopayConfig,
         /** `zennopay:corridor` claim from the session JWT, when present. */
         val corridor: String? = null,
+    )
+
+    /**
+     * In-memory handoff of the receipt token + config from [presentReceipt] to
+     * the receipt activity. Never serialized into an Intent, so the token can't
+     * leak via logcat / recents / exported intents.
+     */
+    internal data class ReceiptHandoff(
+        val intentId: String,
+        val receiptToken: String,
+        val refreshReceiptToken: (suspend (String) -> String?)?,
+        val appearance: ZennopayAppearance,
+        val config: ZennopayConfig,
+        /** Set when the token failed the light preflight check (empty/malformed). */
+        val preflightError: ZennopayError? = null,
     )
 }

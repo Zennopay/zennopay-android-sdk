@@ -15,6 +15,7 @@ import com.zennopay.sdk.internal.net.IntentState
 import com.zennopay.sdk.internal.net.IntentStatus
 import com.zennopay.sdk.internal.net.Merchant
 import com.zennopay.sdk.internal.net.Quote
+import com.zennopay.sdk.internal.net.ReceiptDto
 import com.zennopay.sdk.internal.net.ScanResult
 import com.zennopay.sdk.internal.net.ZennopayRestClient
 import com.zennopay.sdk.scanner.QrPayload
@@ -36,7 +37,7 @@ import java.io.IOException
  * Spec format `<screen>[:<variant>]`:
  *
  *   screen:   scanner | keypad | review | breakdown | processing | receipt
- *             | failure | pending
+ *             | failure | pending | rcpt | refunded
  *   variant:  vnd35     ₫3,500,000 / $140.00      (the demo amount)
  *             vndmax    ₫4,999,999 / $200.00      (max under the ₫5M cap)
  *             vndhuge   ₫999,999,999 / $99,999.99 (defensive overflow probe)
@@ -119,6 +120,31 @@ object ZennopayDebugGallery {
                 updatedAt = null,
             )
 
+        /**
+         * A receipt DTO for the `presentReceipt` render path (`rcpt` /
+         * `refunded` screens) — exercises the real receipt fetch → apply → render
+         * pipeline via [CheckoutController.debugApplyReceipt]. NO network.
+         */
+        internal fun receiptDto(status: String): ReceiptDto = ReceiptDto(
+            intentId = "zp_debug_gallery",
+            status = status,
+            merchant = ReceiptDto.ReceiptMerchant(
+                name = merchantName,
+                accountNo = "•••• 0000",
+                bankNo = "970436",
+                country = if (this == THBMAX) "TH" else "VN",
+            ),
+            amountUsdCents = usdCents,
+            localAmountMinorUnits = localMinorUnits,
+            localCurrency = currencyNumeric,
+            exchangeRate = null,
+            fees = ReceiptDto.ReceiptFees(marginUsdCents = 210L),
+            corridor = corridor,
+            transactionRef = "txn_debug_000042",
+            createdAt = null,
+            updatedAt = null,
+        )
+
         companion object {
             fun parse(raw: String?): Variant = when (raw?.lowercase()) {
                 "vndmax" -> VNDMAX
@@ -140,6 +166,24 @@ object ZennopayDebugGallery {
             initialSessionJwt = "debug",
             refreshSession = null,
         )
+        // Receipt-flow render path: freeze a receipt DTO through the real
+        // apply → render pipeline (`rcpt` = captured, `refunded` = refund copy).
+        if (screen == "rcpt" || screen == "refunded") {
+            val controller = CheckoutController(
+                intentId = "zp_debug_gallery",
+                client = client,
+                idempotencyStore = InMemoryIdempotencyStore(),
+                scope = CoroutineScope(SupervisorJob() + Dispatchers.Main),
+                cameraAvailable = false,
+                initialCorridor = variant.corridor,
+                receiptMode = true,
+                onResult = { /* the gallery never delivers */ },
+            )
+            controller.debugApplyReceipt(
+                variant.receiptDto(if (screen == "refunded") "refunded" else "captured"),
+            )
+            return controller
+        }
         val controller = CheckoutController(
             intentId = "zp_debug_gallery",
             client = client,

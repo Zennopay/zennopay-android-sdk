@@ -14,6 +14,13 @@ import com.zennopay.sdk.internal.net.ScanResult
  */
 internal sealed class CheckoutState {
 
+    /**
+     * The `presentReceipt` flow's initial state: a themed spinner while the
+     * authoritative receipt is fetched (no scan/camera — this reopens a PAST
+     * payment). Resolves to a [Terminal] screen once the receipt loads.
+     */
+    object ReceiptLoading : CheckoutState()
+
     /** Scanning for a QR code (camera live, or the paste-code sheet shown). */
     data class Scanning(
         val cameraAvailable: Boolean,

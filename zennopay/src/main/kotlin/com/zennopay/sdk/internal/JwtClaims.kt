@@ -91,6 +91,50 @@ internal object JwtClaims {
     }
 
     /**
+     * Outcome of [lightDecodeReceiptToken]. A receipt token is scoped to the
+     * partner user (not one intent) and reusable for polling, so — unlike
+     * [validate] — the check is deliberately light: it fails fast ONLY on a
+     * structurally broken token, never on expiry or audience (a stale token is
+     * re-minted via `refreshReceiptToken` on the backend's 401, and the backend
+     * is the authority on `aud`).
+     */
+    internal sealed class ReceiptTokenResult {
+        object Valid : ReceiptTokenResult()
+
+        /** Empty / whitespace-only token. */
+        object Empty : ReceiptTokenResult()
+
+        /** Not 3 segments, bad base64, or unparseable JSON payload. */
+        object Malformed : ReceiptTokenResult()
+    }
+
+    /**
+     * Light client-side check for the receipt token: it must be non-empty and
+     * structurally decode to a JSON claims object. Does NOT require an intent-id
+     * binding and does NOT reject on expiry or audience. Mirrors the iOS SDK's
+     * `lightDecodeReceiptToken`.
+     */
+    internal fun lightDecodeReceiptToken(jwt: String): ReceiptTokenResult {
+        if (jwt.isBlank()) return ReceiptTokenResult.Empty
+        val segments = jwt.split('.')
+        if (segments.size != 3) return ReceiptTokenResult.Malformed
+        val payloadSegment = segments[1]
+        if (payloadSegment.isEmpty()) return ReceiptTokenResult.Malformed
+
+        val decodedBytes = try {
+            Base64.decode(payloadSegment, Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
+        } catch (e: IllegalArgumentException) {
+            return ReceiptTokenResult.Malformed
+        }
+        return try {
+            JSONObject(String(decodedBytes, Charsets.UTF_8))
+            ReceiptTokenResult.Valid
+        } catch (e: JSONException) {
+            ReceiptTokenResult.Malformed
+        }
+    }
+
+    /**
      * Validate a JWT against the expected intentId at the SDK boundary.
      *
      * Required:

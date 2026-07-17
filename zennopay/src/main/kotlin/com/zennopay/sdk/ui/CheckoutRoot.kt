@@ -79,6 +79,7 @@ private fun CheckoutRootContent(controller: CheckoutController, sandbox: Boolean
         Column(modifier = Modifier.fillMaxSize()) {
             Box(modifier = Modifier.weight(1f)) {
                 when (val s = state) {
+                    is CheckoutState.ReceiptLoading -> ReceiptLoadingScreen()
                     is CheckoutState.Scanning -> ScannerScreen(
                         scanning = s,
                         checking = false,

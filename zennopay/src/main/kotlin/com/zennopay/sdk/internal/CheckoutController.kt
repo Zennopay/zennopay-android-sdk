@@ -5,8 +5,14 @@ import com.zennopay.sdk.ZennopayError
 import com.zennopay.sdk.internal.net.ApiResult
 import com.zennopay.sdk.internal.net.IntentState
 import com.zennopay.sdk.internal.net.IntentStatus
+import com.zennopay.sdk.internal.net.Merchant
+import com.zennopay.sdk.internal.net.ReceiptDto
+import com.zennopay.sdk.internal.net.ReceiptStatus
 import com.zennopay.sdk.internal.net.ScanResult
 import com.zennopay.sdk.internal.net.ZennopayRestClient
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.TimeZone
 import com.zennopay.sdk.scanner.QrPayload
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -48,10 +54,21 @@ internal class CheckoutController(
      * the scanner branding row and merchant-card captions.
      */
     initialCorridor: String? = null,
+    /**
+     * When true this controller drives the READ-ONLY `presentReceipt` flow (no
+     * scan/confirm/money movement): it starts in [CheckoutState.ReceiptLoading]
+     * and is advanced by [runReceiptFlow] instead of [recoverOrStart]. The same
+     * terminal screens (receipt / failure / pending) are reused verbatim.
+     */
+    private val receiptMode: Boolean = false,
     private val onResult: (PaymentResult) -> Unit,
 ) {
     private val _state = MutableStateFlow<CheckoutState>(
-        CheckoutState.Scanning(cameraAvailable = cameraAvailable),
+        if (receiptMode) {
+            CheckoutState.ReceiptLoading
+        } else {
+            CheckoutState.Scanning(cameraAvailable = cameraAvailable)
+        },
     )
     val state: StateFlow<CheckoutState> = _state.asStateFlow()
 
@@ -95,6 +112,21 @@ internal class CheckoutController(
     @Volatile private var receiptStatus: IntentStatus? = null
 
     /**
+     * Account number (already masked by the backend) injected by the receipt
+     * flow — the read-only `presentReceipt` path has no local QR peek, so the
+     * masked account comes from the receipt DTO's `merchant.account_no`.
+     */
+    @Volatile private var injectedAccountMasked: String? = null
+
+    /**
+     * The receipt's collapsed status (captured/failed/refunded/pending), set by
+     * the receipt flow. Drives the refund copy on the receipt screen; null in
+     * the checkout flow.
+     */
+    @Volatile var receiptDisplayStatus: ReceiptStatus? = null
+        private set
+
+    /**
      * On (re)launch: if a confirm was already in flight (idempotency key on
      * disk), recover the true terminal status instead of re-scanning. Otherwise
      * start fresh at the scanner. Call once from the host at startup.
@@ -112,6 +144,163 @@ internal class CheckoutController(
             }
             // else: leave the initial Scanning state as-is.
         }
+    }
+
+    // ---- Receipt flow (presentReceipt) ---------------------------------------
+
+    /**
+     * Drive the READ-ONLY `presentReceipt` flow: fetch the authoritative receipt
+     * for a past payment and render the terminal receipt/failure/refund screen.
+     * A `pending` receipt shows the pending-detail screen and polls until it
+     * goes terminal, then swaps to the resolved screen. A structurally invalid
+     * token ([preflightError]) or any load failure lands on the failure screen
+     * with a Done that dismisses. Reuses the existing terminal screens verbatim.
+     * The Kotlin mirror of the iOS `CheckoutViewModel.runReceiptFlow`.
+     */
+    fun runReceiptFlow(preflightError: ZennopayError? = null) {
+        scope.launch {
+            // Already terminal (e.g. seeded for a static render) — nothing to do.
+            if (_state.value is CheckoutState.Terminal) return@launch
+            if (preflightError != null) {
+                finishTerminal(PaymentResult.Failed(intentId, preflightError))
+                return@launch
+            }
+            when (val r = client.getReceipt(intentId)) {
+                is ApiResult.Ok -> {
+                    applyReceipt(r.value)
+                    val status = r.value.receiptStatus
+                    when {
+                        status == null -> finishTerminal(
+                            PaymentResult.Failed(
+                                intentId, ZennopayError.Unknown("unknown_receipt_status"),
+                            ),
+                        )
+                        status.isTerminal -> finishReceipt(status)
+                        else -> {
+                            // Pending: show the pending-detail screen while we poll.
+                            _state.value = CheckoutState.Terminal(PaymentResult.Pending(intentId))
+                            pollReceipt()
+                        }
+                    }
+                }
+                is ApiResult.Err -> finishTerminal(PaymentResult.Failed(intentId, r.error))
+            }
+        }
+    }
+
+    private suspend fun pollReceipt() {
+        when (val r = client.pollReceiptUntilTerminal(intentId)) {
+            is ApiResult.Ok -> {
+                applyReceipt(r.value)
+                finishReceipt(r.value.receiptStatus ?: ReceiptStatus.FAILED)
+            }
+            is ApiResult.Err -> {
+                // A lapsed poll budget is still PENDING — keep the pending screen
+                // up (it may yet settle; the backend auto-refunds otherwise).
+                if (r.error is ZennopayError.PollingTimeout) {
+                    _state.value = CheckoutState.Terminal(PaymentResult.Pending(intentId))
+                } else {
+                    finishTerminal(PaymentResult.Failed(intentId, r.error))
+                }
+            }
+        }
+    }
+
+    /**
+     * Collapse a terminal receipt status onto the terminal screens. `refunded`
+     * renders the receipt with refund messaging (the debit did happen, then was
+     * returned) rather than a failure.
+     */
+    private fun finishReceipt(status: ReceiptStatus) {
+        receiptDisplayStatus = status
+        when (status) {
+            ReceiptStatus.CAPTURED, ReceiptStatus.REFUNDED ->
+                finishTerminal(receiptCompleted())
+            ReceiptStatus.FAILED ->
+                finishTerminal(PaymentResult.Failed(intentId, ZennopayError.PaymentDeclined))
+            ReceiptStatus.PENDING ->
+                _state.value = CheckoutState.Terminal(PaymentResult.Pending(intentId))
+        }
+    }
+
+    /** The host-facing Completed payload for a captured/refunded receipt. */
+    private fun receiptCompleted(): PaymentResult.Completed {
+        val r = receipt
+        return PaymentResult.Completed(
+            intentId = intentId,
+            merchantName = r?.merchantName,
+            localAmount = r?.localMinorUnits?.toString(),
+            localCurrency = r?.localCurrency,
+            usdDebited = r?.usdCents?.let { CurrencyDisplay.groupedNumber(it / 100.0, 2) },
+            transactionId = r?.transactionId,
+            verifiableQrData = null,
+        )
+    }
+
+    /**
+     * Map the receipt DTO onto the display model the terminal screens read
+     * (the [receiptStatus] snapshot + injected masked account + corridor +
+     * timestamp). The Kotlin mirror of the iOS `applyReceipt`.
+     */
+    private fun applyReceipt(dto: ReceiptDto) {
+        val numeric = CurrencyDisplay.numericCode(dto.localCurrency)
+        receiptStatus = IntentStatus(
+            intentId = dto.intentId ?: intentId,
+            status = when (dto.receiptStatus) {
+                ReceiptStatus.FAILED -> IntentState.FAILED
+                ReceiptStatus.PENDING, null -> IntentState.PENDING
+                else -> IntentState.CAPTURED
+            },
+            amountUsdCents = dto.amountUsdCents,
+            corridor = dto.corridor,
+            merchant = Merchant(
+                scheme = null,
+                name = dto.merchant?.name,
+                city = null,
+                country = dto.merchant?.country,
+                mcc = null,
+            ),
+            qrKind = null,
+            quoteId = null,
+            quoteVersion = null,
+            quoteLocalAmountMinorUnits = dto.localAmountMinorUnits,
+            quoteLocalCurrency = numeric,
+            quoteExpiresAt = null,
+            confirmState = null,
+            transactionId = dto.transactionRef,
+            createdAt = dto.createdAt,
+            updatedAt = dto.updatedAt,
+        )
+        injectedAccountMasked = dto.merchant?.accountNo
+        dto.corridor?.takeIf { it.isNotEmpty() }?.let { _corridor.value = it }
+        confirmedAtMillis = parseIso8601(dto.updatedAt)
+            ?: parseIso8601(dto.createdAt)
+            ?: System.currentTimeMillis()
+        // A failed receipt was not debited (or already refunded); everything
+        // else means money moved — drives the refund reassurance copy.
+        walletDebited = dto.receiptStatus != ReceiptStatus.FAILED
+        receiptDisplayStatus = dto.receiptStatus
+    }
+
+    /** Parse an ISO-8601 timestamp to epoch millis, or null if unparseable. */
+    private fun parseIso8601(value: String?): Long? {
+        if (value.isNullOrEmpty()) return null
+        val patterns = listOf(
+            "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+            "yyyy-MM-dd'T'HH:mm:ss'Z'",
+            "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+            "yyyy-MM-dd'T'HH:mm:ssXXX",
+        )
+        for (p in patterns) {
+            try {
+                val fmt = SimpleDateFormat(p, Locale.US)
+                if (p.endsWith("'Z'")) fmt.timeZone = TimeZone.getTimeZone("UTC")
+                return fmt.parse(value)?.time ?: continue
+            } catch (e: Exception) {
+                // try the next pattern
+            }
+        }
+        return null
     }
 
     fun dispatch(event: CheckoutEvent) {
@@ -502,7 +691,9 @@ internal class CheckoutController(
                 transactionId = snap?.transactionId,
                 intentId = intentId,
                 bankName = qrPeek?.bankName,
-                accountMasked = qrPeek?.accountMasked,
+                // The receipt flow injects the backend-masked account; the
+                // checkout flow peeks it from the raw QR.
+                accountMasked = injectedAccountMasked ?: qrPeek?.accountMasked,
                 purpose = purposeText.value.trim(),
                 timestampMillis = confirmedAtMillis ?: System.currentTimeMillis(),
                 corridor = snap?.corridor ?: _corridor.value,
@@ -536,6 +727,25 @@ internal class CheckoutController(
         this.walletDebited = walletDebited
         this.confirmedAtMillis = confirmedAtMillis
         _state.value = state
+    }
+
+    /**
+     * DEBUG-GALLERY ONLY: seed a fully-formed receipt for static rendering /
+     * screenshots — NO network, NO money movement. Mirrors the iOS
+     * `debugApplyReceipt`. Freezes into the resolved terminal screen.
+     */
+    internal fun debugApplyReceipt(dto: ReceiptDto) {
+        applyReceipt(dto)
+        when (dto.receiptStatus ?: ReceiptStatus.CAPTURED) {
+            ReceiptStatus.CAPTURED, ReceiptStatus.REFUNDED ->
+                _state.value = CheckoutState.Terminal(receiptCompleted())
+            ReceiptStatus.FAILED ->
+                _state.value = CheckoutState.Terminal(
+                    PaymentResult.Failed(intentId, ZennopayError.PaymentDeclined),
+                )
+            ReceiptStatus.PENDING ->
+                _state.value = CheckoutState.Terminal(PaymentResult.Pending(intentId))
+        }
     }
 
     /** Display model for the terminal receipt / pending-detail screens. */
