@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Theme for ZennopayCheckoutActivity. The UI itself is Compose; this theme
+      only needs to provide a sane, edge-to-edge window with no ActionBar so the
+      Compose content owns the whole surface. Kept parent-agnostic (Material
+      light) so it merges cleanly into any host app without pulling AppCompat.
+    -->
+    <style name="Theme.Zennopay.Checkout" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowActionBar">false</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+    </style>
+</resources>

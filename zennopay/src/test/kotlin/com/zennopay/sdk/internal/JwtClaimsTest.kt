@@ -24,7 +24,7 @@ class JwtClaimsTest {
     private fun makeJwt(
         intentId: String? = "zp_abc123",
         exp: Long? = now + 600,
-        iss: String? = "wizz",
+        iss: String? = "partner-wallet",
         omitIntent: Boolean = false,
         omitExp: Boolean = false,
         omitIss: Boolean = false,
@@ -138,11 +138,11 @@ class JwtClaimsTest {
 
     @Test
     fun `decode round-trips a well-formed payload`() {
-        val jwt = makeJwt(intentId = "zp_zzz", exp = 4_102_444_800L, iss = "wizz")
+        val jwt = makeJwt(intentId = "zp_zzz", exp = 4_102_444_800L, iss = "partner-wallet")
         val payload = JwtClaims.decode(jwt)
         assertNotNull(payload)
         assertEquals("zp_zzz", payload!!.intentId)
         assertEquals(4_102_444_800L, payload.exp)
-        assertEquals("wizz", payload.iss)
+        assertEquals("partner-wallet", payload.iss)
     }
 }

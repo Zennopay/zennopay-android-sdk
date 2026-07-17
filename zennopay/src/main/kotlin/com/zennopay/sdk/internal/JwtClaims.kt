@@ -33,6 +33,11 @@ internal object JwtClaims {
         val intentId: String?,
         val exp: Long?,
         val iss: String?,
+        /**
+         * Optional `zennopay:corridor` claim (e.g. "vn_vietqr"). Drives the
+         * scanner's corridor branding row; absence is fine (the UI hides it).
+         */
+        val corridor: String? = null,
     )
 
     /**
@@ -80,8 +85,9 @@ internal object JwtClaims {
         // `exp` per RFC 7519 is a NumericDate (seconds since epoch). Treat 0
         // / missing as null so the caller fails the "exp in future" check.
         val exp = if (json.has("exp")) json.optLong("exp", -1L).takeIf { it >= 0 } else null
+        val corridor = json.optString("zennopay:corridor", "").ifEmpty { null }
 
-        return Payload(intentId = intentId, exp = exp, iss = iss)
+        return Payload(intentId = intentId, exp = exp, iss = iss, corridor = corridor)
     }
 
     /**

@@ -1,9 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Intentionally empty.
+  Native Zennopay SDK manifest.
 
-  The partner application is responsible for registering the
-  ZennopayCallbackActivity intent-filter for its own return scheme
-  (e.g. "wizz://payment-result"). See android-sdk/README.md.
+  The SDK renders the entire pay flow (scan -> amount -> confirm -> result)
+  natively in-process. There is NO browser tab and NO happy-path deep link,
+  so the old ZennopayCallbackActivity intent-filter is gone.
+
+  CAMERA is a host-app permission: the host app declares the runtime
+  permission and usage; the SDK requests it at runtime and degrades to a
+  paste-QR fallback on denial. We declare CAMERA here (merged into the host
+  manifest) plus an OPTIONAL camera feature so the SDK doesn't hard-gate the
+  host app off Play devices without a camera.
 -->
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <uses-feature
+        android:name="android.hardware.camera.any"
+        android:required="false" />
+
+    <application>
+        <!--
+          Full-screen host for the native Compose checkout flow. Launched by
+          Zennopay.presentCheckout(). Not exported: only the SDK starts it.
+        -->
+        <activity
+            android:name="com.zennopay.sdk.ZennopayCheckoutActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Zennopay.Checkout"
+            android:configChanges="orientation|screenSize|keyboardHidden|uiMode" />
+    </application>
+</manifest>

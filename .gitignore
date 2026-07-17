@@ -1,24 +1,9 @@
-# Gradle
 .gradle/
 build/
-**/build/
-!gradle/wrapper/gradle-wrapper.jar
-!**/src/**/build/
-
-# Android Studio / IntelliJ
-.idea/
-*.iml
+zennopay/build/
+# Machine-specific SDK path; provide via ANDROID_HOME / ANDROID_SDK_ROOT instead.
 local.properties
-captures/
-.externalNativeBuild/
-.cxx/
-
-# Kotlin
-.kotlin/
-
-# macOS
+*.iml
+.idea/
 .DS_Store
-
-# Editors
-.vscode/
-*.swp
+captures/
