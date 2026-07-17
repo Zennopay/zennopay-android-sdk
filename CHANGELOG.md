@@ -6,6 +6,16 @@ All notable changes to the Zennopay Android SDK are documented here.
 
 Accessibility + fee transparency.
 
+### Packaging
+
+- **Now on Maven Central** as `in.zennopay:sdk:0.2.1`. The Maven coordinate
+  uses the reverse-DNS namespace of the company domain `zennopay.in`
+  (`in.zennopay`), replacing the internal `com.zennopay` placeholder that
+  only ever published to GitHub Packages. The Kotlin import package is
+  unchanged — you still `import com.zennopay.sdk.*`; only the dependency
+  coordinate changed. Depend on it with
+  `implementation("in.zennopay:sdk:0.2.1")`.
+
 ### Added
 
 - **Payment breakdown sheet** — tapping the review screen's "You'll pay

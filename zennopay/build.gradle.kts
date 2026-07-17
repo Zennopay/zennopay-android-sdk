@@ -1,7 +1,11 @@
+import com.vanniktech.maven.publish.AndroidSingleVariantLibrary
+import com.vanniktech.maven.publish.SonatypeHost
+
 plugins {
     id("com.android.library") version "8.5.0"
     id("org.jetbrains.kotlin.android") version "1.9.24"
-    `maven-publish`
+    // Sonatype Central Portal publishing + PGP signing.
+    id("com.vanniktech.maven.publish") version "0.30.0"
 }
 
 android {
@@ -55,11 +59,9 @@ android {
         }
     }
 
-    publishing {
-        singleVariant("release") {
-            withSourcesJar()
-        }
-    }
+    // NOTE: the publication variant (sources + javadoc jars) is registered by
+    // the com.vanniktech.maven.publish plugin via AndroidSingleVariantLibrary
+    // below, so there is intentionally no android { publishing { } } block here.
 }
 
 dependencies {
@@ -116,32 +118,73 @@ dependencies {
     androidTestImplementation("androidx.test:runner:1.6.1")
 }
 
-publishing {
-    publications {
-        register<MavenPublication>("release") {
-            groupId = "com.zennopay"
-            artifactId = "sdk"
-            version = "0.2.1"
+mavenPublishing {
+    // Maven COORDINATE only. The reverse-DNS namespace for the company domain
+    // zennopay.in is `in.zennopay` (NOT com.zennopay). This is deliberately
+    // decoupled from the Kotlin source package and the Android `namespace`,
+    // which both stay `com.zennopay.sdk` — the Gradle groupId and the Kotlin
+    // package are independent and are allowed to differ. Partners depend on
+    //   implementation("in.zennopay:sdk:0.2.1")
+    // but still `import com.zennopay.sdk.*`.
+    coordinates("in.zennopay", "sdk", "0.2.1")
 
-            afterEvaluate {
-                from(components["release"])
+    // Register the release variant with sources + (empty) javadoc jars, both
+    // of which Sonatype Central requires for validation.
+    configure(
+        AndroidSingleVariantLibrary(
+            variant = "release",
+            sourcesJar = true,
+            publishJavadocJar = true,
+        ),
+    )
+
+    // Sonatype Central Portal is the primary (and default) target.
+    publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL)
+
+    // Sign every publication with the in-memory PGP key supplied by CI via
+    // ORG_GRADLE_PROJECT_signingInMemoryKey / *KeyPassword. NO secrets here.
+    signAllPublications()
+
+    pom {
+        name.set("Zennopay Android SDK")
+        description.set(
+            "Android SDK for Zennopay: your app's users scan a local merchant QR code abroad and pay it from their wallet balance.",
+        )
+        url.set("https://github.com/Zennopay/zennopay-android-sdk")
+        licenses {
+            license {
+                name.set("MIT License")
+                url.set("https://opensource.org/licenses/MIT")
+                distribution.set("repo")
             }
         }
+        developers {
+            developer {
+                id.set("zennopay")
+                name.set("Zennopay")
+                url.set("https://zennopay.in")
+            }
+        }
+        scm {
+            url.set("https://github.com/Zennopay/zennopay-android-sdk")
+            connection.set("scm:git:git://github.com/Zennopay/zennopay-android-sdk.git")
+            developerConnection.set("scm:git:ssh://git@github.com/Zennopay/zennopay-android-sdk.git")
+        }
     }
+}
 
-    // Publish target. Credentials/URL are supplied by CI as -P properties or
-    // via env vars; NO secrets here.
-    // For GitHub Packages set:
-    //   mavenRepoUrl=https://maven.pkg.github.com/<org>/<repo>
-    //   mavenUsername=<github user>   mavenPassword=<PAT with write:packages>
-    // For Maven Central use the OSSRH URL + Sonatype credentials instead.
+// Optional fallback repository: GitHub Packages. Central is primary; this
+// target is only used when the GitHubPackages tasks are invoked explicitly
+// (e.g. ./gradlew publishAllPublicationsToGitHubPackagesRepository) with a
+// PAT. Credentials come from CI props/env — NO secrets here.
+publishing {
     repositories {
         maven {
-            name = "ZennopayMaven"
+            name = "GitHubPackages"
             url = uri(
                 (project.findProperty("mavenRepoUrl") as String?)
                     ?: System.getenv("MAVEN_REPO_URL")
-                    ?: "https://maven.pkg.github.com/Zennopay/zennopay-android-sdk"
+                    ?: "https://maven.pkg.github.com/Zennopay/zennopay-android-sdk",
             )
             credentials {
                 username = (project.findProperty("mavenUsername") as String?)

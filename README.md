@@ -1,6 +1,6 @@
 # Zennopay Android SDK
 
-The Android SDK for [Zennopay](https://zennopay.com) — let your app's users
+The Android SDK for [Zennopay](https://zennopay.in) — let your app's users
 scan local merchant QR codes abroad and pay from their wallet balance.
 
 The SDK presents the **PaymentSheet**: the full native pay experience — QR
@@ -23,23 +23,37 @@ Full documentation: [Zennopay/zennopay-docs](https://github.com/Zennopay/zennopa
 
 ## Installation
 
+Published to **Maven Central** as `in.zennopay:sdk`. Make sure
+`mavenCentral()` is in your repositories, then add the dependency.
+
+Gradle Kotlin DSL (`build.gradle.kts`):
+
 ```kotlin
-// app/build.gradle.kts
 dependencies {
-    implementation("com.zennopay:sdk:0.2.0")
+    implementation("in.zennopay:sdk:0.2.1")
 }
 ```
 
-> **Note:** publication to a public Maven repository is pending. Until then,
-> build from source and publish to your local Maven repository:
+Gradle Groovy (`build.gradle`):
+
+```groovy
+dependencies {
+    implementation 'in.zennopay:sdk:0.2.1'
+}
+```
+
+> **Namespace note:** the Maven coordinate is `in.zennopay:sdk` (the
+> reverse-DNS form of the company domain `zennopay.in`), but the Kotlin
+> import package is unchanged — you still `import com.zennopay.sdk.*`. The
+> Gradle group and the Kotlin package are intentionally independent:
 >
-> ```bash
-> git clone https://github.com/Zennopay/zennopay-android-sdk
-> cd zennopay-android-sdk
-> ./gradlew :zennopay:publishToMavenLocal
+> ```kotlin
+> // dependency coordinate
+> implementation("in.zennopay:sdk:0.2.1")
+> // …but the imports stay:
+> import com.zennopay.sdk.Zennopay
+> import com.zennopay.sdk.PaymentResult
 > ```
->
-> and add `mavenLocal()` to your app's repositories.
 
 ### Camera permission
 

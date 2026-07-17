@@ -1,0 +1,70 @@
+name: Publish to Maven Central
+
+# Publishes in.zennopay:sdk to the Sonatype Central Portal.
+#
+# Triggers on any v* tag (the release tag) and via manual dispatch. The job
+# is a no-op until the Central user token secrets are present, so tagging or
+# pushing this workflow never fails the run before the token is configured.
+#
+# Required repo secrets (Settings -> Secrets and variables -> Actions):
+#   MAVEN_CENTRAL_USERNAME  - Central Portal user token username
+#   MAVEN_CENTRAL_PASSWORD  - Central Portal user token password
+#   SIGNING_KEY             - ASCII-armored PGP private key (already set)
+#   SIGNING_KEY_PASSWORD    - passphrase for SIGNING_KEY (already set)
+#
+# Generate the token at https://central.sonatype.com -> Account ->
+# Generate User Token. Once both MAVEN_CENTRAL_* secrets exist, re-run this
+# workflow via "Run workflow" (workflow_dispatch) or by re-triggering on the
+# existing v0.2.1 tag.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  publish:
+    name: publishToMavenCentral
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # The `secrets` context is not available in job/step `if:` conditions,
+      # so we map the token to env here and gate the publish step on it. This
+      # makes the workflow skip cleanly (green) until the token is configured.
+      - name: Preflight — is the Central token configured?
+        id: preflight
+        env:
+          MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+        run: |
+          if [ -n "$MAVEN_CENTRAL_USERNAME" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+            echo "Central token present — will publish."
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::MAVEN_CENTRAL_USERNAME is not set — skipping Maven Central publish. Add the token secrets and re-run."
+          fi
+
+      - name: Set up JDK 17
+        if: steps.preflight.outputs.ready == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        if: steps.preflight.outputs.ready == 'true'
+        uses: android-actions/setup-android@v3
+        with:
+          packages: "platforms;android-34 build-tools;34.0.0"
+
+      - name: Publish to Maven Central
+        if: steps.preflight.outputs.ready == 'true'
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_KEY_PASSWORD }}
+        run: ./gradlew publishAndReleaseToMavenCentral --no-configuration-cache --no-daemon
