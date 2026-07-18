@@ -81,10 +81,10 @@ data class ZennopayConfig(
          * (`/v1/payment_intents/...`). Matches the staging host used by the
          * rest of the stack.
          */
-        const val DEFAULT_STAGING_BASE_URL: String = "https://api.staging.zennopay.com"
+        const val DEFAULT_STAGING_BASE_URL: String = "https://api.staging.zennopay.in"
 
         /** Production REST base. Selected by [PRODUCTION]. */
-        const val DEFAULT_PRODUCTION_BASE_URL: String = "https://api.zennopay.com"
+        const val DEFAULT_PRODUCTION_BASE_URL: String = "https://api.zennopay.in"
 
         /** Staging (default): staging host + SANDBOX pill. */
         val STAGING: ZennopayConfig =

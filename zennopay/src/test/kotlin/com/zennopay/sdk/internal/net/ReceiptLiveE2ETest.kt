@@ -67,7 +67,7 @@ class ReceiptLiveE2ETest {
             FakeTransport.ok(liveCapturedJson),
         )
         val client = ZennopayRestClient(
-            ZennopayConfig(apiBaseUrl = "https://api.test.zennopay.com"),
+            ZennopayConfig(apiBaseUrl = "https://api.test.zennopay.in"),
             transport,
             "rcpt",
             refreshSession = null,

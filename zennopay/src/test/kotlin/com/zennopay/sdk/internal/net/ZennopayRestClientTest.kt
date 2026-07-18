@@ -17,7 +17,7 @@ import org.robolectric.annotation.Config
 @Config(sdk = [33])
 class ZennopayRestClientTest {
 
-    private val config = ZennopayConfig(apiBaseUrl = "https://api.test.zennopay.com")
+    private val config = ZennopayConfig(apiBaseUrl = "https://api.test.zennopay.in")
 
     private fun client(
         transport: FakeTransport,

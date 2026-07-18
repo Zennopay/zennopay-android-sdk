@@ -32,7 +32,7 @@ import org.robolectric.annotation.Config
 @Config(sdk = [33])
 class ReceiptFlowControllerTest {
 
-    private val config = ZennopayConfig(apiBaseUrl = "https://api.test.zennopay.com")
+    private val config = ZennopayConfig(apiBaseUrl = "https://api.test.zennopay.in")
 
     private fun receiptController(
         scope: CoroutineScope,

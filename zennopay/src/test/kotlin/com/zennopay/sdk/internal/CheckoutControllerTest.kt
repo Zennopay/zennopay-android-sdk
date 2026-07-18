@@ -32,7 +32,7 @@ import org.robolectric.annotation.Config
 @Config(sdk = [33])
 class CheckoutControllerTest {
 
-    private val config = ZennopayConfig(apiBaseUrl = "https://api.test.zennopay.com")
+    private val config = ZennopayConfig(apiBaseUrl = "https://api.test.zennopay.in")
 
     /** EMVCo dynamic PromptPay-ish payload: tag 54 (amount) PRESENT. */
     private val dynamicQr = "00020153037645405120755802TH"

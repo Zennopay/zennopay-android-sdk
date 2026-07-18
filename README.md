@@ -30,7 +30,7 @@ Gradle Kotlin DSL (`build.gradle.kts`):
 
 ```kotlin
 dependencies {
-    implementation("in.zennopay:sdk:0.3.0")
+    implementation("in.zennopay:sdk:0.5.0")
 }
 ```
 
@@ -38,7 +38,7 @@ Gradle Groovy (`build.gradle`):
 
 ```groovy
 dependencies {
-    implementation 'in.zennopay:sdk:0.3.0'
+    implementation 'in.zennopay:sdk:0.5.0'
 }
 ```
 
@@ -49,7 +49,7 @@ dependencies {
 >
 > ```kotlin
 > // dependency coordinate
-> implementation("in.zennopay:sdk:0.3.0")
+> implementation("in.zennopay:sdk:0.5.0")
 > // …but the imports stay:
 > import com.zennopay.sdk.Zennopay
 > import com.zennopay.sdk.PaymentResult

@@ -2,6 +2,11 @@
 
 All notable changes to the Zennopay Android SDK are documented here.
 
+## 0.5.0 - 2026-07-18
+
+Version-aligned across all SDKs; API domain zennopay.com → zennopay.in
+(canonical). No API changes.
+
 ## 0.3.0 - 2026-07-18
 
 Reopen the authoritative receipt.
@@ -27,7 +32,7 @@ Reopen the authoritative receipt.
 
 `presentReceipt` is fully independent of `presentCheckout`, which is
 unchanged and source-compatible. Depend on it with
-`implementation("in.zennopay:sdk:0.3.0")`.
+`implementation("in.zennopay:sdk:0.5.0")`.
 
 ## 0.2.1 - 2026-07-18
 

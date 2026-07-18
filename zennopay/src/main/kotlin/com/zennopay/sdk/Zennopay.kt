@@ -14,7 +14,7 @@ import java.util.concurrent.ConcurrentHashMap
  *
  * Usage:
  * ```
- * Zennopay.configure(ZennopayConfig(apiBaseUrl = "https://api.zennopay.com"))
+ * Zennopay.configure(ZennopayConfig(apiBaseUrl = "https://api.zennopay.in"))
  * Zennopay.presentCheckout(
  *     activity = this,
  *     intentId = "pi_abc123",
