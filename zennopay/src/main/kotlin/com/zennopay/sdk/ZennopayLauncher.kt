@@ -28,7 +28,7 @@ import com.zennopay.sdk.ui.ZennopayAppearance
  */
 @Composable
 fun rememberZennopayLauncher(
-    config: ZennopayConfig = ZennopayConfig.STAGING,
+    config: ZennopayConfig = ZennopayConfig.SANDBOX,
     appearance: ZennopayAppearance = ZennopayAppearance.Automatic,
     refreshSession: (suspend (String) -> String?)? = null,
     onResult: (PaymentResult) -> Unit,
@@ -74,7 +74,7 @@ fun rememberZennopayLauncher(
  */
 @Composable
 fun rememberZennopayReceiptLauncher(
-    config: ZennopayConfig = ZennopayConfig.STAGING,
+    config: ZennopayConfig = ZennopayConfig.SANDBOX,
     appearance: ZennopayAppearance = ZennopayAppearance.Automatic,
     refreshReceiptToken: (suspend (String) -> String?)? = null,
     onDismiss: () -> Unit = {},

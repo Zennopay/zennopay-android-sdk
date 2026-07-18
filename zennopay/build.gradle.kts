@@ -124,9 +124,9 @@ mavenPublishing {
     // decoupled from the Kotlin source package and the Android `namespace`,
     // which both stay `com.zennopay.sdk` — the Gradle groupId and the Kotlin
     // package are independent and are allowed to differ. Partners depend on
-    //   implementation("in.zennopay:sdk:0.5.0")
+    //   implementation("in.zennopay:sdk:0.6.0")
     // but still `import com.zennopay.sdk.*`.
-    coordinates("in.zennopay", "sdk", "0.5.0")
+    coordinates("in.zennopay", "sdk", "0.6.0")
 
     // Register the release variant with sources + (empty) javadoc jars, both
     // of which Sonatype Central requires for validation.

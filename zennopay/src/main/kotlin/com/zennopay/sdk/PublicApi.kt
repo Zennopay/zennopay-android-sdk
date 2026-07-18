@@ -52,46 +52,76 @@ sealed class PaymentResult {
  * the environment is a VALUE, not a code path — one integration, and the
  * sandbox chrome + base URL follow from [environment].
  *
- * Use the [STAGING] / [PRODUCTION] companions for the canonical hosts, or
+ * Use the [SANDBOX] / [PRODUCTION] companions for the canonical hosts, or
  * construct with a custom [apiBaseUrl] (+ `environment = Environment.CUSTOM`)
- * for local/pentest targets. Default is STAGING so a fresh integration never
+ * for local/pentest targets. Default is SANDBOX so a fresh integration never
  * accidentally points at production.
  */
 data class ZennopayConfig(
-    /** REST base, no trailing slash. Default: staging. */
-    val apiBaseUrl: String = DEFAULT_STAGING_BASE_URL,
+    /** REST base, no trailing slash. Default: sandbox. */
+    val apiBaseUrl: String = DEFAULT_SANDBOX_BASE_URL,
     /**
      * Which environment this config targets. Drives the base URL default and the
      * persistent SANDBOX affordance in the sheet header (present unless
      * [Environment.PRODUCTION]).
      */
-    val environment: Environment = Environment.STAGING,
+    val environment: Environment = Environment.SANDBOX,
     /** Per-request network timeout. */
     val requestTimeoutMillis: Long = 20_000L,
 ) {
     /** True only for the production environment; gates the SANDBOX pill off. */
     val isProduction: Boolean get() = environment == Environment.PRODUCTION
 
-    /** SDK environment. Never hardcoded elsewhere; always derived from here. */
-    enum class Environment { STAGING, PRODUCTION, CUSTOM }
+    /**
+     * SDK environment. Never hardcoded elsewhere; always derived from here.
+     *
+     * `STAGING` is a deprecated alias for [SANDBOX] retained for source
+     * compatibility; new code should use [SANDBOX].
+     */
+    enum class Environment {
+        SANDBOX,
+        PRODUCTION,
+        CUSTOM,
+
+        @Deprecated("Use SANDBOX", ReplaceWith("Environment.SANDBOX"))
+        STAGING,
+    }
 
     companion object {
         /**
-         * Staging REST base for the SDK-facing endpoints
-         * (`/v1/payment_intents/...`). Matches the staging host used by the
-         * rest of the stack.
+         * Sandbox REST base for the SDK-facing endpoints
+         * (`/v1/payment_intents/...`). The environment partners integrate and
+         * test against.
          */
-        const val DEFAULT_STAGING_BASE_URL: String = "https://api.staging.zennopay.in"
+        const val DEFAULT_SANDBOX_BASE_URL: String = "https://api.sandbox.zennopay.in"
 
         /** Production REST base. Selected by [PRODUCTION]. */
         const val DEFAULT_PRODUCTION_BASE_URL: String = "https://api.zennopay.in"
 
-        /** Staging (default): staging host + SANDBOX pill. */
-        val STAGING: ZennopayConfig =
-            ZennopayConfig(DEFAULT_STAGING_BASE_URL, Environment.STAGING)
+        /**
+         * Deprecated alias for [DEFAULT_SANDBOX_BASE_URL]. Now points at the
+         * sandbox host (`https://api.sandbox.zennopay.in`).
+         */
+        @Deprecated(
+            "Use DEFAULT_SANDBOX_BASE_URL",
+            ReplaceWith("ZennopayConfig.DEFAULT_SANDBOX_BASE_URL"),
+        )
+        const val DEFAULT_STAGING_BASE_URL: String = "https://api.sandbox.zennopay.in"
+
+        /** Sandbox (default): sandbox host + SANDBOX pill. */
+        val SANDBOX: ZennopayConfig =
+            ZennopayConfig(DEFAULT_SANDBOX_BASE_URL, Environment.SANDBOX)
 
         /** Production: prod host, no SANDBOX pill. */
         val PRODUCTION: ZennopayConfig =
             ZennopayConfig(DEFAULT_PRODUCTION_BASE_URL, Environment.PRODUCTION)
+
+        /**
+         * Deprecated alias for [SANDBOX]. Retained so existing integrations keep
+         * compiling; now resolves to the sandbox gateway
+         * (`https://api.sandbox.zennopay.in`).
+         */
+        @Deprecated("Use SANDBOX", ReplaceWith("ZennopayConfig.SANDBOX"))
+        val STAGING: ZennopayConfig = SANDBOX
     }
 }

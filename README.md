@@ -30,7 +30,7 @@ Gradle Kotlin DSL (`build.gradle.kts`):
 
 ```kotlin
 dependencies {
-    implementation("in.zennopay:sdk:0.5.0")
+    implementation("in.zennopay:sdk:0.6.0")
 }
 ```
 
@@ -38,7 +38,7 @@ Gradle Groovy (`build.gradle`):
 
 ```groovy
 dependencies {
-    implementation 'in.zennopay:sdk:0.5.0'
+    implementation 'in.zennopay:sdk:0.6.0'
 }
 ```
 
@@ -49,7 +49,7 @@ dependencies {
 >
 > ```kotlin
 > // dependency coordinate
-> implementation("in.zennopay:sdk:0.5.0")
+> implementation("in.zennopay:sdk:0.6.0")
 > // …but the imports stay:
 > import com.zennopay.sdk.Zennopay
 > import com.zennopay.sdk.PaymentResult
@@ -78,7 +78,7 @@ import com.zennopay.sdk.rememberZennopayLauncher
 @Composable
 fun PayButton(session: CheckoutSession, viewModel: WalletViewModel) {
     val present = rememberZennopayLauncher(
-        config = ZennopayConfig.STAGING,        // .PRODUCTION for live traffic
+        config = ZennopayConfig.SANDBOX,         // .PRODUCTION for live traffic
         refreshSession = { intentId ->
             // Called on session expiry (401): re-mint for the SAME intent,
             // or return null if you can't.
@@ -111,7 +111,7 @@ Zennopay.presentCheckout(
     intentId = session.intentId,
     sessionJwt = session.sessionJwt,
     refreshSession = { id -> walletApi.remintSessionJwt(id) },
-    config = ZennopayConfig.STAGING,
+    config = ZennopayConfig.SANDBOX,
 ) { result ->
     when (result) {
         is PaymentResult.Completed -> showReceipt(result)
@@ -150,7 +150,7 @@ import com.zennopay.sdk.rememberZennopayReceiptLauncher
 @Composable
 fun ReceiptButton(intentId: String, viewModel: WalletViewModel) {
     val presentReceipt = rememberZennopayReceiptLauncher(
-        config = ZennopayConfig.STAGING,
+        config = ZennopayConfig.SANDBOX,
         refreshReceiptToken = { id ->
             // Called on token expiry (401): re-mint for the same user, or null.
             viewModel.remintReceiptToken(id)
@@ -171,7 +171,7 @@ Zennopay.presentReceipt(
     intentId = intentId,
     receiptToken = receiptTokenFromYourBackend,
     refreshReceiptToken = { id -> walletApi.remintReceiptToken(id) },
-    config = ZennopayConfig.STAGING,
+    config = ZennopayConfig.SANDBOX,
     onDismiss = { /* dismissed */ },
 )
 ```
@@ -200,6 +200,20 @@ val appearance = ZennopayAppearance(
 
 Pass nothing (`ZennopayAppearance.Automatic`) for the default Zennopay look
 with system light/dark.
+
+### Environments
+
+`ZennopayConfig` selects the environment — a value, never a code path:
+
+```kotlin
+ZennopayConfig.SANDBOX      // https://api.sandbox.zennopay.in — SANDBOX pill shown (default)
+ZennopayConfig.PRODUCTION   // https://api.zennopay.in — real money, no sandbox chrome
+ZennopayConfig(apiBaseUrl = "http://10.0.2.2:3000", environment = ZennopayConfig.Environment.CUSTOM)
+```
+
+> `ZennopayConfig.STAGING` is **deprecated** — it is a compatibility alias for
+> `ZennopayConfig.SANDBOX` (same host, `https://api.sandbox.zennopay.in`).
+> Existing code keeps working; migrate to `SANDBOX`.
 
 ## Testing
 

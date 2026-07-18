@@ -2,9 +2,35 @@
 
 All notable changes to the Zennopay Android SDK are documented here.
 
+## 0.6.0 - 2026-07-18
+
+Partner-facing environment names. The config presets now match the docs and API
+reference: **sandbox** and **production**.
+
+### Added
+
+- `ZennopayConfig.SANDBOX` — `https://api.sandbox.zennopay.in`, the environment
+  partners integrate and test against. Now the default for `ZennopayConfig()`
+  and `rememberZennopayLauncher` / `presentCheckout`.
+- `ZennopayConfig.Environment.SANDBOX` and
+  `ZennopayConfig.DEFAULT_SANDBOX_BASE_URL`.
+
+### Changed
+
+- Default `apiBaseUrl` / `environment` and the launcher `config:` defaults now
+  resolve to `SANDBOX` (was `STAGING`). Same behavior, partner-facing name.
+
+### Deprecated
+
+- `ZennopayConfig.STAGING`, `Environment.STAGING`, and `DEFAULT_STAGING_BASE_URL`
+  are deprecated (`@Deprecated(..., ReplaceWith("...SANDBOX"))`) and are now
+  compatibility aliases for the sandbox equivalents — `STAGING` points at
+  `https://api.sandbox.zennopay.in` (previously `https://api.staging.zennopay.in`).
+  Existing code keeps compiling; migrate to `SANDBOX`.
+
 ## 0.5.0 - 2026-07-18
 
-Version-aligned across all SDKs; API domain zennopay.com → zennopay.in
+Version-aligned across all SDKs; API domain migrated to zennopay.in
 (canonical). No API changes.
 
 ## 0.3.0 - 2026-07-18
