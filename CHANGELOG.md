@@ -2,6 +2,21 @@
 
 All notable changes to the Zennopay Android SDK are documented here.
 
+## 0.7.0 - 2026-07-21
+
+Partner package allowlist support. The SDK now identifies the host app to the
+backend so partners can restrict their credentials to registered app packages.
+
+### Added
+
+- Every REST call (scan/confirm/status/receipt) now sends the host app's
+  `applicationId` (package name) in the `X-Zennopay-Package` header. Partners
+  register their `applicationId` in Console → Developers → Security to enable
+  the package allowlist. Stamped in `send()` so it rides every request,
+  including the refreshed-token retry. Null-safe: omitted when a package name
+  isn't available. No-op when the partner hasn't configured an allowlist
+  (enforce-when-configured).
+
 ## 0.6.0 - 2026-07-18
 
 Partner-facing environment names. The config presets now match the docs and API
