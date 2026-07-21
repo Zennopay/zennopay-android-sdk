@@ -53,6 +53,7 @@ class ZennopayCheckoutActivity : ComponentActivity() {
             transport = HttpUrlConnectionTransport(),
             initialSessionJwt = handoff.sessionJwt,
             refreshSession = handoff.refreshSession,
+            appPackage = applicationContext.packageName,
         )
 
         val ctrl = CheckoutController(

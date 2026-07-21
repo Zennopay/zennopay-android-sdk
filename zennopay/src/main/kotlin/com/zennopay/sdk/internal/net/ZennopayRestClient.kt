@@ -55,6 +55,12 @@ internal class ZennopayRestClient(
      * dispatcher so `runTest` virtual time controls the network hop.
      */
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    /**
+     * App identifier (applicationContext.packageName) sent as X-Zennopay-Package
+     * on every call, for the partner's package allowlist (backend migration
+     * 015). Null in unit tests / when unavailable — the header is then omitted.
+     */
+    private val appPackage: String? = null,
 ) {
     @Volatile
     private var sessionJwt: String = initialSessionJwt
@@ -257,7 +263,14 @@ internal class ZennopayRestClient(
                     method = method,
                     url = url,
                     bearer = sessionJwt,
-                    headers = extraHeaders,
+                    // Stamp the app package (allowlist, migration 015) on every
+                    // request alongside any per-call extra headers.
+                    headers =
+                        if (appPackage != null) {
+                            extraHeaders + ("X-Zennopay-Package" to appPackage)
+                        } else {
+                            extraHeaders
+                        },
                     body = body,
                     timeoutMillis = config.requestTimeoutMillis,
                 ),
