@@ -18,8 +18,12 @@ Full documentation: [Zennopay/zennopay-docs](https://github.com/Zennopay/zennopa
 - Your app does **not** need to use Compose — the sheet runs in its own
   Activity. A Compose-first entry point (`rememberZennopayLauncher`) is
   provided for hosts that are.
-- A backend session endpoint that creates the payment intent and mints the
-  short-lived session JWT (your API keys never ship in the app)
+- A backend session endpoint that creates the payment intent by calling
+  Zennopay's `POST /v1/payment_intents` (HMAC-signed, server-to-server) and
+  relays the returned Zennopay-minted `session_token` to the sheet — no JWT
+  keypair to generate or register (your API keys never ship in the app). See
+  the [partner-starter](https://github.com/Zennopay/zennopay-partner-starter)
+  (v0.2.0+) for a reference backend.
 
 ## Installation
 
@@ -65,8 +69,9 @@ without a camera.
 
 ## Quickstart
 
-Fetch a checkout session (intent id + session JWT) from your backend, then
-present the sheet.
+Ask your backend for a checkout session — it calls Zennopay's
+`POST /v1/payment_intents` (HMAC) and returns the intent id plus the
+Zennopay-minted `session_token` — then present the sheet.
 
 ### Compose hosts
 
@@ -80,9 +85,10 @@ fun PayButton(session: CheckoutSession, viewModel: WalletViewModel) {
     val present = rememberZennopayLauncher(
         config = ZennopayConfig.SANDBOX,         // .PRODUCTION for live traffic
         refreshSession = { intentId ->
-            // Called on session expiry (401): re-mint for the SAME intent,
-            // or return null if you can't.
-            viewModel.remintSessionJwt(intentId)
+            // Called on session expiry (401): ask your backend for a fresh
+            // session_token for the SAME intent (it re-calls Zennopay's
+            // session endpoint), or return null if you can't.
+            viewModel.remintSessionToken(intentId)
         },
     ) { result ->
         when (result) {
